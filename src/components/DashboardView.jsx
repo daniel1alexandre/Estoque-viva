@@ -475,12 +475,9 @@ export default function DashboardView({
                       <span className="font-semibold text-slate-800 truncate" title={prod.name}>
                         {prod.name}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        ({prod.unit})
-                      </span>
                     </div>
                     <span className="font-bold text-blue-700 whitespace-nowrap">
-                      {prod.totalOutput} un
+                      {prod.totalOutput}
                     </span>
                   </div>
                   {/* Progress bar */}
@@ -547,9 +544,9 @@ export default function DashboardView({
                         {div.name}
                       </div>
                       <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                        <span>Esperado: <strong>{div.currentStock + div.entries - div.outputCount}</strong></span>
+                        <span>Contagem da Tarde: <strong>{div.outputCount ?? 0}</strong></span>
                         <span>•</span>
-                        <span>Contado: <strong>{div.countedStock}</strong></span>
+                        <span>Última Contagem: <strong>{div.countedStock}</strong></span>
                         <span>•</span>
                         <span>Por: <strong>{div.countedBy}</strong></span>
                       </div>

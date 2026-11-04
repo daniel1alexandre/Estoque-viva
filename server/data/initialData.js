@@ -8,9 +8,8 @@ export const initialUsers = [
 export const initialCategories = [
   'CERVEJAS',
   'DOCES',
-  'BARRA DE PROTÉINAS',
+  'BARRA DE PROTEÍNAS',
   'CHIPS',
-  'SECOS',
   'BEBIDAS',
   'REFRIGERANTES',
   'ENERGÉTICOS',
@@ -19,9 +18,9 @@ export const initialCategories = [
   'ESPUMANTES',
   'CHA',
   'SUCOS',
-  'ÁGUA',
   'GRIPS',
-  'BOLAS'
+  'BOLAS',
+  'ÁGUA'
 ];
 
 export const initialProducts = [
@@ -103,12 +102,10 @@ export const initialProducts = [
   { id: 'p-chip-15', code: 'CHIP-015', name: 'Chips Pingo Picanha', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
   { id: 'p-chip-16', code: 'CHIP-016', name: 'Chips Ruffles', category: 'CHIPS', unit: 'PCT', minStock: 20, currentStock: 50 },
   { id: 'p-chip-17', code: 'CHIP-017', name: 'Chips Stiksy', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
-
-  // --- SECOS ---
-  { id: 'p-sec-1', code: 'SEC-001', name: 'Amendoim Japones', category: 'SECOS', unit: 'PCT', minStock: 15, currentStock: 40 },
-  { id: 'p-sec-2', code: 'SEC-002', name: 'Amendoim Sem Pele', category: 'SECOS', unit: 'PCT', minStock: 15, currentStock: 40 },
-  { id: 'p-sec-3', code: 'SEC-003', name: 'Amendoim Temperado', category: 'SECOS', unit: 'PCT', minStock: 15, currentStock: 40 },
-  { id: 'p-sec-4', code: 'SEC-004', name: 'Pipoca Tradicional', category: 'SECOS', unit: 'PCT', minStock: 15, currentStock: 30 },
+  { id: 'p-sec-1', code: 'SEC-001', name: 'Amendoim Japones', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 40 },
+  { id: 'p-sec-2', code: 'SEC-002', name: 'Amendoim Sem Pele', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 40 },
+  { id: 'p-sec-3', code: 'SEC-003', name: 'Amendoim Temperado', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 40 },
+  { id: 'p-sec-4', code: 'SEC-004', name: 'Pipoca Tradicional', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
 
   // --- BEBIDAS ---
   { id: 'p-beb-1', code: 'BEB-001', name: 'Chocoleite Garrafinha', category: 'BEBIDAS', unit: 'GF', minStock: 15, currentStock: 30 },

@@ -385,12 +385,12 @@ export default function DailyCountView({
                   Última Contagem
                 </th>
 
-                {/* 7. Estoque Final (fórmula: (Inicial + Entrada) - Última Contagem) */}
+                {/* 7. Estoque Final (fórmula: Última Contagem) */}
                 <th className="py-3 px-2 text-center w-32 font-bold text-slate-900 bg-slate-100/70 border-r border-slate-200">
                   Estoque Final
                 </th>
 
-                {/* 8. Diferença (fórmula: Última Contagem - Contagem da Tarde - Entrada) */}
+                {/* 8. Diferença (fórmula: Última Contagem - Contagem da Tarde) */}
                 <th className="py-3 px-2 text-center w-32">
                   Diferença
                 </th>
