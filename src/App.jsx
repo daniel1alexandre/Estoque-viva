@@ -606,6 +606,7 @@ export default function App() {
             onUpdateItem={handleUpdateItem}
             onToggleCheck={handleToggleCheck}
             onBatchCheck={handleBatchCheck}
+            onSaveProduct={handleSaveProduct}
           />
         ) : activeTab === 'deposito' ? (
           <DailyCountView
@@ -620,6 +621,7 @@ export default function App() {
             onUpdateItem={handleUpdateItem}
             onToggleCheck={handleToggleCheck}
             onBatchCheck={handleBatchCheck}
+            onSaveProduct={handleSaveProduct}
           />
         ) : (
           <DashboardView

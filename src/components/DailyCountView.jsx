@@ -10,11 +10,13 @@ import {
   Package, 
   Layers, 
   Clock, 
-  Info,
-  Warehouse,
-  Store,
-  SunMedium,
-  UserCheck
+  Info, 
+  Warehouse, 
+  Store, 
+  SunMedium, 
+  UserCheck,
+  Edit2,
+  X
 } from 'lucide-react';
 
 export default function DailyCountView({
@@ -27,11 +29,18 @@ export default function DailyCountView({
   countData,
   onUpdateItem,
   onToggleCheck,
-  onBatchCheck
+  onBatchCheck,
+  onSaveProduct
 }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('TODAS');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'checked', 'divergence'
+
+  // Inline product editing right on the table row
+  const [editingInlineProdId, setEditingInlineProdId] = useState(null);
+  const [inlineName, setInlineName] = useState('');
+  const [inlineCategory, setInlineCategory] = useState('');
+  const [inlineUnit, setInlineUnit] = useState('');
 
   // Current session items dictionary
   const items = countData?.items || {};
@@ -453,13 +462,89 @@ export default function DailyCountView({
                       </td>
 
                       {/* 2. Item / Produto */}
-                      <td className="py-2.5 px-3">
-                        <div className="font-semibold text-slate-900 leading-snug">
-                          {product.name}
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                          Un: {product.unit || 'UN'}
-                        </div>
+                      <td className="py-2.5 px-3 min-w-[240px]">
+                        {editingInlineProdId === product.id ? (
+                          <div className="space-y-1.5 p-2 bg-blue-50/90 rounded-lg border border-blue-400 shadow-xs">
+                            <div>
+                              <label className="text-[10px] font-bold text-blue-900 block mb-0.5">Nome do Produto:</label>
+                              <input
+                                type="text"
+                                value={inlineName}
+                                onChange={(e) => setInlineName(e.target.value)}
+                                className="w-full text-xs font-semibold border border-blue-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                autoFocus
+                              />
+                            </div>
+                            <div className="flex items-center gap-1.5 pt-0.5">
+                              <select
+                                value={inlineCategory}
+                                onChange={(e) => setInlineCategory(e.target.value)}
+                                className="text-[11px] border border-blue-300 rounded px-1.5 py-1 bg-white font-medium flex-1 focus:outline-none"
+                              >
+                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                              <input
+                                type="text"
+                                value={inlineUnit}
+                                onChange={(e) => setInlineUnit(e.target.value)}
+                                className="w-16 text-[11px] border border-blue-300 rounded px-1.5 py-1 bg-white text-center font-medium focus:outline-none"
+                                placeholder="Unidade"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!inlineName.trim()) return;
+                                  if (onSaveProduct) {
+                                    onSaveProduct({
+                                      id: product.id,
+                                      name: inlineName.trim(),
+                                      category: inlineCategory,
+                                      unit: inlineUnit.trim() || 'UN',
+                                      minStock: product.minStock,
+                                      currentStock: product.currentStock
+                                    });
+                                  }
+                                  setEditingInlineProdId(null);
+                                }}
+                                className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer text-xs font-bold shadow-xs transition"
+                              >
+                                Salvar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingInlineProdId(null)}
+                                className="p-1 text-slate-500 hover:bg-slate-200 rounded cursor-pointer"
+                                title="Cancelar"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between group">
+                            <div>
+                              <div className="font-semibold text-slate-900 leading-snug">
+                                {product.name}
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                                Un: {product.unit || 'UN'}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingInlineProdId(product.id);
+                                setInlineName(product.name);
+                                setInlineCategory(product.category);
+                                setInlineUnit(product.unit || 'UN');
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer"
+                              title="Editar este item exatamente aqui"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </td>
 
                       {/* 3. Estoque Inicial */}
