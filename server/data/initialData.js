@@ -6,158 +6,200 @@ export const initialUsers = [
 ];
 
 export const initialCategories = [
-  'Bebidas & Laticínios',
-  'Alimentos Secos',
-  'Embalagens',
-  'Higiene & Limpeza',
-  'Descartáveis & Escritório',
-  'Matéria-Prima'
+  'CERVEJAS',
+  'DOCES',
+  'BARRA DE PROTÉINAS',
+  'CHIPS',
+  'SECOS',
+  'BEBIDAS',
+  'REFRIGERANTES',
+  'ENERGÉTICOS',
+  'ISOTONICOS',
+  'VINHOS',
+  'ESPUMANTES',
+  'CHA',
+  'SUCOS',
+  'ÁGUA',
+  'GRIPS',
+  'BOLAS'
 ];
 
 export const initialProducts = [
-  {
-    id: 'prod-1',
-    code: 'BEB-001',
-    name: 'Leite Integral 1L',
-    category: 'Bebidas & Laticínios',
-    unit: 'CX 12x1L',
-    minStock: 20,
-    currentStock: 85
-  },
-  {
-    id: 'prod-2',
-    code: 'BEB-002',
-    name: 'Suco de Laranja Natural 1L',
-    category: 'Bebidas & Laticínios',
-    unit: 'UN',
-    minStock: 30,
-    currentStock: 120
-  },
-  {
-    id: 'prod-3',
-    code: 'BEB-003',
-    name: 'Café Torrado Especial 500g',
-    category: 'Bebidas & Laticínios',
-    unit: 'PCT',
-    minStock: 15,
-    currentStock: 48
-  },
-  {
-    id: 'prod-4',
-    code: 'ALI-001',
-    name: 'Arroz Tipo 1 - Fardo 6x5kg',
-    category: 'Alimentos Secos',
-    unit: 'FARDO',
-    minStock: 25,
-    currentStock: 64
-  },
-  {
-    id: 'prod-5',
-    code: 'ALI-002',
-    name: 'Feijão Carioca 1kg',
-    category: 'Alimentos Secos',
-    unit: 'FARDO 10x1kg',
-    minStock: 20,
-    currentStock: 50
-  },
-  {
-    id: 'prod-6',
-    code: 'ALI-003',
-    name: 'Açúcar Cristal 5kg',
-    category: 'Alimentos Secos',
-    unit: 'FARDO 6x5kg',
-    minStock: 15,
-    currentStock: 40
-  },
-  {
-    id: 'prod-7',
-    code: 'ALI-004',
-    name: 'Óleo de Soja 900ml',
-    category: 'Alimentos Secos',
-    unit: 'CX 20x900ml',
-    minStock: 10,
-    currentStock: 32
-  },
-  {
-    id: 'prod-8',
-    code: 'EMB-001',
-    name: 'Caixa de Papelão Padrão M (40x30x25)',
-    category: 'Embalagens',
-    unit: 'FARDO 50UN',
-    minStock: 50,
-    currentStock: 210
-  },
-  {
-    id: 'prod-9',
-    code: 'EMB-002',
-    name: 'Fita Adesiva Transparente 48mm x 100m',
-    category: 'Embalagens',
-    unit: 'ROLO',
-    minStock: 40,
-    currentStock: 135
-  },
-  {
-    id: 'prod-10',
-    code: 'EMB-003',
-    name: 'Plástico Bolha 1.20m x 100m',
-    category: 'Embalagens',
-    unit: 'BOBINA',
-    minStock: 8,
-    currentStock: 18
-  },
-  {
-    id: 'prod-11',
-    code: 'LIM-001',
-    name: 'Detergente Neutro Concentrado 5L',
-    category: 'Higiene & Limpeza',
-    unit: 'GL 5L',
-    minStock: 15,
-    currentStock: 45
-  },
-  {
-    id: 'prod-12',
-    code: 'LIM-002',
-    name: 'Desinfetante Hospitalar 5L',
-    category: 'Higiene & Limpeza',
-    unit: 'GL 5L',
-    minStock: 12,
-    currentStock: 28
-  },
-  {
-    id: 'prod-13',
-    code: 'LIM-003',
-    name: 'Papel Toalha Interfolha 2 Dobras',
-    category: 'Higiene & Limpeza',
-    unit: 'CX 1000FL',
-    minStock: 30,
-    currentStock: 75
-  },
-  {
-    id: 'prod-14',
-    code: 'ESC-001',
-    name: 'Copo Descartável 200ml',
-    category: 'Descartáveis & Escritório',
-    unit: 'CX 2500UN',
-    minStock: 10,
-    currentStock: 38
-  },
-  {
-    id: 'prod-15',
-    code: 'ESC-002',
-    name: 'Papel A4 Sulfite 75g (Resma)',
-    category: 'Descartáveis & Escritório',
-    unit: 'CX 10 RESMAS',
-    minStock: 15,
-    currentStock: 42
-  },
-  {
-    id: 'prod-16',
-    code: 'MP-001',
-    name: 'Bobina Filme Stretch Manual 500mm',
-    category: 'Matéria-Prima',
-    unit: 'BOBINA',
-    minStock: 20,
-    currentStock: 62
-  }
-];
+  // --- CERVEJAS ---
+  { id: 'p-cerv-1', code: 'CERV-001', name: 'Cerveja Corona', category: 'CERVEJAS', unit: 'LONG NECK 330ml', minStock: 24, currentStock: 48 },
+  { id: 'p-cerv-2', code: 'CERV-002', name: 'Cerveja Corona Zero', category: 'CERVEJAS', unit: 'LONG NECK 330ml', minStock: 12, currentStock: 24 },
+  { id: 'p-cerv-3', code: 'CERV-003', name: 'Cerveja Corona 600ml', category: 'CERVEJAS', unit: 'GF 600ml', minStock: 12, currentStock: 36 },
+  { id: 'p-cerv-4', code: 'CERV-004', name: 'Cerveja Eisenbahn 600ml', category: 'CERVEJAS', unit: 'GF 600ml', minStock: 12, currentStock: 36 },
+  { id: 'p-cerv-5', code: 'CERV-005', name: 'Cerveja Eisenbahn long', category: 'CERVEJAS', unit: 'LONG NECK 355ml', minStock: 24, currentStock: 48 },
+  { id: 'p-cerv-6', code: 'CERV-006', name: 'Cerveja Flying Fish', category: 'CERVEJAS', unit: 'LONG NECK', minStock: 12, currentStock: 24 },
+  { id: 'p-cerv-7', code: 'CERV-007', name: 'Cerveja Heineken 600ml', category: 'CERVEJAS', unit: 'GF 600ml', minStock: 24, currentStock: 60 },
+  { id: 'p-cerv-8', code: 'CERV-008', name: 'Cerveja Heineken Long', category: 'CERVEJAS', unit: 'LONG NECK 330ml', minStock: 24, currentStock: 72 },
+  { id: 'p-cerv-9', code: 'CERV-009', name: 'Cerveja Heineken Long Zero', category: 'CERVEJAS', unit: 'LONG NECK 330ml', minStock: 12, currentStock: 30 },
+  { id: 'p-cerv-10', code: 'CERV-010', name: 'Cerveja Original 600ml', category: 'CERVEJAS', unit: 'GF 600ml', minStock: 24, currentStock: 48 },
+  { id: 'p-cerv-11', code: 'CERV-011', name: 'Cerveja Original 300ml', category: 'CERVEJAS', unit: 'GF 300ml', minStock: 12, currentStock: 24 },
+  { id: 'p-cerv-12', code: 'CERV-012', name: 'Cerveja Sol Zero', category: 'CERVEJAS', unit: 'LONG NECK 330ml', minStock: 12, currentStock: 24 },
+  { id: 'p-cerv-13', code: 'CERV-013', name: 'Cerveja Spaten 600ml', category: 'CERVEJAS', unit: 'GF 600ml', minStock: 24, currentStock: 48 },
+  { id: 'p-cerv-14', code: 'CERV-014', name: 'Cerveja Spaten long', category: 'CERVEJAS', unit: 'LONG NECK 355ml', minStock: 24, currentStock: 48 },
+  { id: 'p-cerv-15', code: 'CERV-015', name: 'Cerveja Stella Artois 600ml', category: 'CERVEJAS', unit: 'GF 600ml', minStock: 12, currentStock: 36 },
+  { id: 'p-cerv-16', code: 'CERV-016', name: 'Cerveja Stella Pure Gold long', category: 'CERVEJAS', unit: 'LONG NECK 330ml', minStock: 24, currentStock: 48 },
+  { id: 'p-cerv-17', code: 'CERV-017', name: 'Cerveja Stella Pure Gold 600mll', category: 'CERVEJAS', unit: 'GF 600ml', minStock: 12, currentStock: 24 },
+  { id: 'p-cerv-18', code: 'CERV-018', name: 'Cerveja Budweiser', category: 'CERVEJAS', unit: 'LONG NECK 330ml', minStock: 24, currentStock: 48 },
 
+  // --- DOCES ---
+  { id: 'p-doc-1', code: 'DOC-001', name: 'Paçoquita Rolha', category: 'DOCES', unit: 'UN', minStock: 50, currentStock: 120 },
+  { id: 'p-doc-2', code: 'DOC-002', name: 'Pacoquita', category: 'DOCES', unit: 'UN', minStock: 30, currentStock: 60 },
+  { id: 'p-doc-3', code: 'DOC-003', name: 'Paçoca de Amendoim', category: 'DOCES', unit: 'UN', minStock: 30, currentStock: 60 },
+  { id: 'p-doc-4', code: 'DOC-004', name: 'Pé de Moleque', category: 'DOCES', unit: 'UN', minStock: 30, currentStock: 50 },
+  { id: 'p-doc-5', code: 'DOC-005', name: 'Amendoleite', category: 'DOCES', unit: 'UN', minStock: 20, currentStock: 40 },
+  { id: 'p-doc-6', code: 'DOC-006', name: 'Fondant de Leite', category: 'DOCES', unit: 'UN', minStock: 20, currentStock: 40 },
+  { id: 'p-doc-7', code: 'DOC-007', name: 'Bala Mentos Fruit', category: 'DOCES', unit: 'UN', minStock: 20, currentStock: 45 },
+  { id: 'p-doc-8', code: 'DOC-008', name: 'Chocolate Baton', category: 'DOCES', unit: 'UN', minStock: 30, currentStock: 60 },
+  { id: 'p-doc-9', code: 'DOC-009', name: 'Chocolate Caribe', category: 'DOCES', unit: 'UN', minStock: 20, currentStock: 40 },
+  { id: 'p-doc-10', code: 'DOC-010', name: 'Chocolate Kit Kat', category: 'DOCES', unit: 'UN', minStock: 30, currentStock: 75 },
+  { id: 'p-doc-11', code: 'DOC-011', name: 'Chocolate Kit Kat Branco', category: 'DOCES', unit: 'UN', minStock: 20, currentStock: 45 },
+  { id: 'p-doc-12', code: 'DOC-012', name: 'Chocolate Lolo', category: 'DOCES', unit: 'UN', minStock: 20, currentStock: 40 },
+  { id: 'p-doc-13', code: 'DOC-013', name: 'Chocolate Ouro Branco', category: 'DOCES', unit: 'UN', minStock: 40, currentStock: 90 },
+  { id: 'p-doc-14', code: 'DOC-014', name: 'Chocolate Snickers Branco', category: 'DOCES', unit: 'UN', minStock: 20, currentStock: 40 },
+  { id: 'p-doc-15', code: 'DOC-015', name: 'Chocolate Snikers', category: 'DOCES', unit: 'UN', minStock: 30, currentStock: 60 },
+  { id: 'p-doc-16', code: 'DOC-016', name: 'Chocolate Sonho de Valsa', category: 'DOCES', unit: 'UN', minStock: 40, currentStock: 100 },
+  { id: 'p-doc-17', code: 'DOC-017', name: 'Chocolate Suflair', category: 'DOCES', unit: 'UN', minStock: 20, currentStock: 45 },
+  { id: 'p-doc-18', code: 'DOC-018', name: 'Chocolate Crocante', category: 'DOCES', unit: 'UN', minStock: 20, currentStock: 40 },
+  { id: 'p-doc-19', code: 'DOC-019', name: 'Chocolate Prestigio', category: 'DOCES', unit: 'UN', minStock: 25, currentStock: 50 },
+  { id: 'p-doc-20', code: 'DOC-020', name: 'Dates Dark', category: 'DOCES', unit: 'UN', minStock: 15, currentStock: 30 },
+  { id: 'p-doc-21', code: 'DOC-021', name: 'Dates Just', category: 'DOCES', unit: 'UN', minStock: 15, currentStock: 30 },
+  { id: 'p-doc-22', code: 'DOC-022', name: 'Dates Red', category: 'DOCES', unit: 'UN', minStock: 15, currentStock: 30 },
+  { id: 'p-doc-23', code: 'DOC-023', name: 'Datas Pistache', category: 'DOCES', unit: 'UN', minStock: 15, currentStock: 30 },
+  { id: 'p-doc-24', code: 'DOC-024', name: 'Gomets', category: 'DOCES', unit: 'UN', minStock: 25, currentStock: 50 },
+  { id: 'p-doc-25', code: 'DOC-025', name: 'Halls Menta', category: 'DOCES', unit: 'UN', minStock: 30, currentStock: 60 },
+  { id: 'p-doc-26', code: 'DOC-026', name: 'Trident Hortela', category: 'DOCES', unit: 'UN', minStock: 30, currentStock: 70 },
+  { id: 'p-doc-27', code: 'DOC-027', name: 'Trident Tutti', category: 'DOCES', unit: 'UN', minStock: 30, currentStock: 65 },
+  { id: 'p-doc-28', code: 'DOC-028', name: 'Trident Menta', category: 'DOCES', unit: 'UN', minStock: 30, currentStock: 70 },
+  { id: 'p-doc-29', code: 'DOC-029', name: 'Pipoca Doce Caramelo', category: 'DOCES', unit: 'PCT', minStock: 15, currentStock: 35 },
+  { id: 'p-doc-30', code: 'DOC-030', name: 'Pipoca Doce Nesquik', category: 'DOCES', unit: 'PCT', minStock: 15, currentStock: 35 },
+  { id: 'p-doc-31', code: 'DOC-031', name: 'Pipoca Doce Ninho', category: 'DOCES', unit: 'PCT', minStock: 15, currentStock: 35 },
+  { id: 'p-doc-32', code: 'DOC-032', name: 'It´s Brownie', category: 'DOCES', unit: 'UN', minStock: 15, currentStock: 40 },
+
+  // --- BARRA DE PROTÉINAS ---
+  { id: 'p-prot-1', code: 'PROT-001', name: 'Protwins Creme de Avelã', category: 'BARRA DE PROTÉINAS', unit: 'UN', minStock: 20, currentStock: 40 },
+  { id: 'p-prot-2', code: 'PROT-002', name: 'Protwins Morango', category: 'BARRA DE PROTÉINAS', unit: 'UN', minStock: 20, currentStock: 40 },
+  { id: 'p-prot-3', code: 'PROT-003', name: 'Protwins Cookies & Cream', category: 'BARRA DE PROTÉINAS', unit: 'UN', minStock: 20, currentStock: 40 },
+  { id: 'p-prot-4', code: 'PROT-004', name: 'Go! Recovery Gel Guaraná com Açai', category: 'BARRA DE PROTÉINAS', unit: 'SACHÊ', minStock: 20, currentStock: 50 },
+
+  // --- CHIPS ---
+  { id: 'p-chip-1', code: 'CHIP-001', name: 'Chips Lays Cebola', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 35 },
+  { id: 'p-chip-2', code: 'CHIP-002', name: 'Chips Lays Original', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 40 },
+  { id: 'p-chip-3', code: 'CHIP-003', name: 'Chips Baconzitos', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
+  { id: 'p-chip-4', code: 'CHIP-004', name: 'Chips Cebolitos', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
+  { id: 'p-chip-5', code: 'CHIP-005', name: 'Chips Cheetos Lua', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 35 },
+  { id: 'p-chip-6', code: 'CHIP-006', name: 'Chips Cheetos Mix', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
+  { id: 'p-chip-7', code: 'CHIP-007', name: 'Chips Cheetos Onda', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 35 },
+  { id: 'p-chip-8', code: 'CHIP-008', name: 'Chips Doritos', category: 'CHIPS', unit: 'PCT', minStock: 25, currentStock: 60 },
+  { id: 'p-chip-9', code: 'CHIP-009', name: 'Chips Eqlibri Presunto', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
+  { id: 'p-chip-10', code: 'CHIP-010', name: 'Chips Eqlibri Queijo', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
+  { id: 'p-chip-11', code: 'CHIP-011', name: 'Chips Fandangos Queijo', category: 'CHIPS', unit: 'PCT', minStock: 20, currentStock: 45 },
+  { id: 'p-chip-12', code: 'CHIP-012', name: 'Chips Fandangos Presunto', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 35 },
+  { id: 'p-chip-13', code: 'CHIP-013', name: 'Chips Ovinhos', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
+  { id: 'p-chip-14', code: 'CHIP-014', name: 'Chips Pingo de Ouro', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
+  { id: 'p-chip-15', code: 'CHIP-015', name: 'Chips Pingo Picanha', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
+  { id: 'p-chip-16', code: 'CHIP-016', name: 'Chips Ruffles', category: 'CHIPS', unit: 'PCT', minStock: 20, currentStock: 50 },
+  { id: 'p-chip-17', code: 'CHIP-017', name: 'Chips Stiksy', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 30 },
+
+  // --- SECOS ---
+  { id: 'p-sec-1', code: 'SEC-001', name: 'Amendoim Japones', category: 'SECOS', unit: 'PCT', minStock: 15, currentStock: 40 },
+  { id: 'p-sec-2', code: 'SEC-002', name: 'Amendoim Sem Pele', category: 'SECOS', unit: 'PCT', minStock: 15, currentStock: 40 },
+  { id: 'p-sec-3', code: 'SEC-003', name: 'Amendoim Temperado', category: 'SECOS', unit: 'PCT', minStock: 15, currentStock: 40 },
+  { id: 'p-sec-4', code: 'SEC-004', name: 'Pipoca Tradicional', category: 'SECOS', unit: 'PCT', minStock: 15, currentStock: 30 },
+
+  // --- BEBIDAS ---
+  { id: 'p-beb-1', code: 'BEB-001', name: 'Chocoleite Garrafinha', category: 'BEBIDAS', unit: 'GF', minStock: 15, currentStock: 30 },
+  { id: 'p-beb-2', code: 'BEB-002', name: 'Smirnoff Ice', category: 'BEBIDAS', unit: 'GF 275ml', minStock: 20, currentStock: 45 },
+  { id: 'p-beb-3', code: 'BEB-003', name: 'Smirnoff Ice Raspberry', category: 'BEBIDAS', unit: 'GF 275ml', minStock: 15, currentStock: 30 },
+  { id: 'p-beb-4', code: 'BEB-004', name: 'Sprite Absolut 269ml', category: 'BEBIDAS', unit: 'LATA 269ml', minStock: 15, currentStock: 30 },
+  { id: 'p-beb-5', code: 'BEB-005', name: 'Jack e Coke', category: 'BEBIDAS', unit: 'LATA 350ml', minStock: 15, currentStock: 30 },
+  { id: 'p-beb-6', code: 'BEB-006', name: 'Toddynho', category: 'BEBIDAS', unit: 'CX 200ml', minStock: 20, currentStock: 50 },
+  { id: 'p-beb-7', code: 'BEB-007', name: 'Skinka Uva', category: 'BEBIDAS', unit: 'PET 450ml', minStock: 15, currentStock: 35 },
+  { id: 'p-beb-8', code: 'BEB-008', name: 'Agua Tonica', category: 'BEBIDAS', unit: 'LATA 350ml', minStock: 15, currentStock: 35 },
+
+  // --- REFRIGERANTES ---
+  { id: 'p-ref-1', code: 'REF-001', name: 'Refri Citrus', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 15, currentStock: 40 },
+  { id: 'p-ref-2', code: 'REF-002', name: 'Refri Coca Normal', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 30, currentStock: 90 },
+  { id: 'p-ref-3', code: 'REF-003', name: 'Refri Coca Zero 350ml', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 30, currentStock: 80 },
+  { id: 'p-ref-4', code: 'REF-004', name: 'Refri Fanta Guarana', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 15, currentStock: 35 },
+  { id: 'p-ref-5', code: 'REF-005', name: 'Refri Fanta Guarana Zero', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 15, currentStock: 30 },
+  { id: 'p-ref-6', code: 'REF-006', name: 'Refri Fanta Laranja', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 15, currentStock: 40 },
+  { id: 'p-ref-7', code: 'REF-007', name: 'Refri Fanta Uva', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 15, currentStock: 35 },
+  { id: 'p-ref-8', code: 'REF-008', name: 'Refri Guarana Antartica', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 25, currentStock: 70 },
+  { id: 'p-ref-9', code: 'REF-009', name: 'Refri Guarana Antartica Zero', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 20, currentStock: 50 },
+  { id: 'p-ref-10', code: 'REF-010', name: 'Refri Itubaina', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 15, currentStock: 30 },
+  { id: 'p-ref-11', code: 'REF-011', name: 'Refri Pepsi Zero', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 15, currentStock: 30 },
+  { id: 'p-ref-12', code: 'REF-012', name: 'Refri Sprite', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 20, currentStock: 45 },
+  { id: 'p-ref-13', code: 'REF-013', name: 'Refri Sprite Zero', category: 'REFRIGERANTES', unit: 'LATA 350ml', minStock: 15, currentStock: 30 },
+
+  // --- ENERGÉTICOS ---
+  { id: 'p-ene-1', code: 'ENE-001', name: 'Energetico Monster Mango', category: 'ENERGÉTICOS', unit: 'LATA 473ml', minStock: 15, currentStock: 36 },
+  { id: 'p-ene-2', code: 'ENE-002', name: 'Energetico Monster Mango Zero', category: 'ENERGÉTICOS', unit: 'LATA 473ml', minStock: 15, currentStock: 30 },
+  { id: 'p-ene-3', code: 'ENE-003', name: 'Energetico Monster Morango', category: 'ENERGÉTICOS', unit: 'LATA 473ml', minStock: 15, currentStock: 30 },
+  { id: 'p-ene-4', code: 'ENE-004', name: 'Energetico Monster Preto', category: 'ENERGÉTICOS', unit: 'LATA 473ml', minStock: 20, currentStock: 48 },
+  { id: 'p-ene-5', code: 'ENE-005', name: 'Energetico Monster Preto Zero', category: 'ENERGÉTICOS', unit: 'LATA 473ml', minStock: 15, currentStock: 36 },
+  { id: 'p-ene-6', code: 'ENE-006', name: 'Energetico Monster Branco', category: 'ENERGÉTICOS', unit: 'LATA 473ml', minStock: 20, currentStock: 48 },
+  { id: 'p-ene-7', code: 'ENE-007', name: 'Energetico Monster Pessego', category: 'ENERGÉTICOS', unit: 'LATA 473ml', minStock: 15, currentStock: 36 },
+  { id: 'p-ene-8', code: 'ENE-008', name: 'Energetico Red Bull Tropical', category: 'ENERGÉTICOS', unit: 'LATA 250ml', minStock: 20, currentStock: 48 },
+  { id: 'p-ene-9', code: 'ENE-009', name: 'Energetico Red Bull Tradicional', category: 'ENERGÉTICOS', unit: 'LATA 250ml', minStock: 30, currentStock: 72 },
+  { id: 'p-ene-10', code: 'ENE-010', name: 'Energetico Red Bull Zero', category: 'ENERGÉTICOS', unit: 'LATA 250ml', minStock: 15, currentStock: 36 },
+  { id: 'p-ene-11', code: 'ENE-011', name: 'Energetico Tum', category: 'ENERGÉTICOS', unit: 'LATA 250ml', minStock: 15, currentStock: 30 },
+  { id: 'p-ene-12', code: 'ENE-012', name: 'Energetico Tum Zero', category: 'ENERGÉTICOS', unit: 'LATA 250ml', minStock: 15, currentStock: 30 },
+
+  // --- ISOTONICOS ---
+  { id: 'p-iso-1', code: 'ISO-001', name: 'Isot Gatorade Laranja', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 20, currentStock: 45 },
+  { id: 'p-iso-2', code: 'ISO-002', name: 'Isot Gatorade Laranja Zero', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 30 },
+  { id: 'p-iso-3', code: 'ISO-003', name: 'Isot Gatorade Frutas Citricas', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 35 },
+  { id: 'p-iso-4', code: 'ISO-004', name: 'Isot Gatorade Limao', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 20, currentStock: 40 },
+  { id: 'p-iso-5', code: 'ISO-005', name: 'Isot Gatorade Maracuja', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 35 },
+  { id: 'p-iso-6', code: 'ISO-006', name: 'Isot Gatorade Morango e Maracuja', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 30 },
+  { id: 'p-iso-7', code: 'ISO-007', name: 'Isot Gatorade Tangerina', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 35 },
+  { id: 'p-iso-8', code: 'ISO-008', name: 'Isot Gatorade Uva', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 20, currentStock: 45 },
+  { id: 'p-iso-9', code: 'ISO-009', name: 'Isot Power Ade Laranja', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 35 },
+  { id: 'p-iso-10', code: 'ISO-010', name: 'Isot Power Ade Mix Frutas', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 35 },
+  { id: 'p-iso-11', code: 'ISO-011', name: 'Isot Power Ade Mix Frutas Zero', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 30 },
+  { id: 'p-iso-12', code: 'ISO-012', name: 'Isot Power Ade Frutas Vermelhas', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 35 },
+  { id: 'p-iso-13', code: 'ISO-013', name: 'Isotonico Power Limão', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 30 },
+  { id: 'p-iso-14', code: 'ISO-014', name: 'Isotonico Power Tangerina', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 30 },
+  { id: 'p-iso-15', code: 'ISO-015', name: 'Isotonico Power Uva', category: 'ISOTONICOS', unit: 'GF 500ml', minStock: 15, currentStock: 30 },
+
+  // --- VINHOS ---
+  { id: 'p-vin-1', code: 'VIN-001', name: 'Vinho Reservado Merlot', category: 'VINHOS', unit: 'GF 750ml', minStock: 6, currentStock: 18 },
+  { id: 'p-vin-2', code: 'VIN-002', name: 'Vinho Reservado Sauvignhon Blank', category: 'VINHOS', unit: 'GF 750ml', minStock: 6, currentStock: 18 },
+  { id: 'p-vin-3', code: 'VIN-003', name: 'Vinho Reservado Sweet Rose', category: 'VINHOS', unit: 'GF 750ml', minStock: 6, currentStock: 18 },
+
+  // --- ESPUMANTES ---
+  { id: 'p-esp-1', code: 'ESP-001', name: 'Espumante Salton', category: 'ESPUMANTES', unit: 'GF 750ml', minStock: 6, currentStock: 16 },
+  { id: 'p-esp-2', code: 'ESP-002', name: 'Espumante Brut Rose', category: 'ESPUMANTES', unit: 'GF 750ml', minStock: 6, currentStock: 14 },
+  { id: 'p-esp-3', code: 'ESP-003', name: 'Espumante Vero Demi', category: 'ESPUMANTES', unit: 'GF 750ml', minStock: 6, currentStock: 14 },
+
+  // --- CHA ---
+  { id: 'p-cha-1', code: 'CHA-001', name: 'Cha Leao Limao', category: 'CHA', unit: 'PET 450ml', minStock: 15, currentStock: 36 },
+  { id: 'p-cha-2', code: 'CHA-002', name: 'Cha Leao Original', category: 'CHA', unit: 'PET 450ml', minStock: 15, currentStock: 36 },
+  { id: 'p-cha-3', code: 'CHA-003', name: 'Cha Leao Pessego', category: 'CHA', unit: 'PET 450ml', minStock: 15, currentStock: 36 },
+
+  // --- SUCOS ---
+  { id: 'p-suc-1', code: 'SUC-001', name: 'Suco Dell vale Manga', category: 'SUCOS', unit: 'LATA 290ml', minStock: 15, currentStock: 35 },
+  { id: 'p-suc-2', code: 'SUC-002', name: 'Suco Dell valer Pessego', category: 'SUCOS', unit: 'LATA 290ml', minStock: 15, currentStock: 35 },
+  { id: 'p-suc-3', code: 'SUC-003', name: 'Suco Dell valer Uva', category: 'SUCOS', unit: 'LATA 290ml', minStock: 15, currentStock: 40 },
+  { id: 'p-suc-4', code: 'SUC-004', name: 'Suco Dell vale Maracuja', category: 'SUCOS', unit: 'LATA 290ml', minStock: 15, currentStock: 35 },
+  { id: 'p-suc-5', code: 'SUC-005', name: 'Suco Prats Uva', category: 'SUCOS', unit: 'GF 900ml', minStock: 12, currentStock: 24 },
+  { id: 'p-suc-6', code: 'SUC-006', name: 'Suco Prats Laranja', category: 'SUCOS', unit: 'GF 900ml', minStock: 12, currentStock: 28 },
+  { id: 'p-suc-7', code: 'SUC-007', name: 'Suco Campo Largo Laranja', category: 'SUCOS', unit: 'GF 900ml', minStock: 12, currentStock: 24 },
+  { id: 'p-suc-8', code: 'SUC-008', name: 'Suco Campo Largo Uva', category: 'SUCOS', unit: 'GF 900ml', minStock: 12, currentStock: 24 },
+
+  // --- ÁGUA ---
+  { id: 'p-agu-1', code: 'AGU-001', name: 'Água Sem Gás', category: 'ÁGUA', unit: 'GF 500ml', minStock: 48, currentStock: 120 },
+  { id: 'p-agu-2', code: 'AGU-002', name: 'Água Com Gás', category: 'ÁGUA', unit: 'GF 500ml', minStock: 36, currentStock: 90 },
+  { id: 'p-agu-3', code: 'AGU-003', name: 'Água de Coco Integral Campo Largo', category: 'ÁGUA', unit: 'CX 1L', minStock: 15, currentStock: 36 },
+
+  // --- GRIPS ---
+  { id: 'p-grip-1', code: 'GRP-001', name: 'Grip JAYA Cores', category: 'GRIPS', unit: 'UN', minStock: 10, currentStock: 25 },
+
+  // --- BOLAS ---
+  { id: 'p-bola-1', code: 'BOL-001', name: 'Jogo de bolas Jaya', category: 'BOLAS', unit: 'TUBO 3UN', minStock: 10, currentStock: 20 },
+  { id: 'p-bola-2', code: 'BOL-002', name: 'Jogo de bolas Joog', category: 'BOLAS', unit: 'TUBO 3UN', minStock: 10, currentStock: 20 }
+];
