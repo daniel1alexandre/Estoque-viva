@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Search, 
-  Filter, 
   CheckCircle, 
   AlertTriangle, 
   Check, 
@@ -11,14 +10,14 @@ import {
   Package, 
   Layers, 
   Clock, 
-  UserCheck, 
-  SlidersHorizontal,
-  ChevronRight,
-  Info
+  Info,
+  Warehouse,
+  Store
 } from 'lucide-react';
 
 export default function DailyCountView({
   selectedDate,
+  location = 'loja', // 'loja' | 'deposito'
   products,
   categories,
   users,
@@ -48,8 +47,7 @@ export default function DailyCountView({
       if (searchTerm.trim() !== '') {
         const term = searchTerm.toLowerCase();
         const matchesName = prod.name.toLowerCase().includes(term);
-        const matchesCode = (prod.code || '').toLowerCase().includes(term);
-        if (!matchesName && !matchesCode) return false;
+        if (!matchesName) return false;
       }
 
       // Status filter
@@ -98,18 +96,48 @@ export default function DailyCountView({
     };
   }, [products, items]);
 
-  // Handle batch check for all currently visible items
   const handleCheckAllVisible = (checkState) => {
     const ids = filteredProducts.map(p => p.id);
     onBatchCheck(ids, checkState);
   };
 
+  const isDeposito = location === 'deposito';
+
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-4">
+      {/* Location Banner */}
+      <div className={`px-4 py-3 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs ${
+        isDeposito 
+          ? 'bg-amber-50/70 border-amber-200 text-amber-900' 
+          : 'bg-blue-50/70 border-blue-200 text-blue-900'
+      }`}>
+        <div className="flex items-center gap-2.5">
+          <div className={`p-2 rounded-lg text-white ${isDeposito ? 'bg-amber-600' : 'bg-blue-600'}`}>
+            {isDeposito ? <Warehouse className="w-5 h-5" /> : <Store className="w-5 h-5" />}
+          </div>
+          <div>
+            <h2 className="text-base font-bold tracking-tight">
+              {isDeposito ? 'Controle de Estoque - Depósito Central' : 'Controle de Estoque - Loja / Frente'}
+            </h2>
+            <p className="text-xs opacity-80">
+              {isDeposito 
+                ? 'Contagem dos produtos armazenados no depósito (armazenamento de apoio e caixas)' 
+                : 'Contagem diária dos produtos expostos e disponíveis na frente da loja'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs font-semibold">
+          <span className="bg-white/80 px-2.5 py-1 rounded-md border border-black/5 shadow-xs">
+            {stats.checkedCount} de {stats.totalItems} itens conferidos ({stats.percentChecked}%)
+          </span>
+        </div>
+      </div>
+
       {/* Top metrics summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold">Total de Itens</span>
             <Package className="w-4 h-4 text-blue-500" />
           </div>
@@ -117,13 +145,13 @@ export default function DailyCountView({
             <span className="text-2xl font-bold text-slate-900">{stats.totalItems}</span>
             <span className="text-xs text-slate-500">produtos</span>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            {categories.length} categorias ativas
+          <div className="mt-1.5 text-[11px] text-slate-500">
+            {categories.length} categorias cadastradas
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold">Conferência</span>
             <CheckCircle className="w-4 h-4 text-emerald-500" />
           </div>
@@ -139,8 +167,8 @@ export default function DailyCountView({
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold">Divergências</span>
             <AlertTriangle className={`w-4 h-4 ${stats.divergenceCount > 0 ? 'text-amber-500' : 'text-slate-400'}`} />
           </div>
@@ -150,13 +178,13 @@ export default function DailyCountView({
             </span>
             <span className="text-xs text-slate-500">itens</span>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500">
-            {stats.divergenceCount === 0 ? 'Estoque 100% alinhado' : 'Atenção aos itens com falta/sobra'}
+          <div className="mt-1.5 text-[11px] text-slate-500">
+            {stats.divergenceCount === 0 ? 'Estoque 100% alinhado' : 'Atenção aos itens com diferença'}
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold">Entradas do Dia</span>
             <TrendingUp className="w-4 h-4 text-emerald-500" />
           </div>
@@ -164,13 +192,13 @@ export default function DailyCountView({
             <span className="text-2xl font-bold text-slate-900">+{stats.totalEntries}</span>
             <span className="text-xs text-slate-500">unidades</span>
           </div>
-          <div className="mt-2 text-[11px] text-emerald-600 font-medium">
-            Entradas registradas hoje
+          <div className="mt-1.5 text-[11px] text-emerald-600 font-medium">
+            Entradas registradas
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between col-span-2 md:col-span-1">
-          <div className="flex items-center justify-between text-slate-500 mb-2">
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between col-span-2 md:col-span-1">
+          <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold">Saídas do Dia</span>
             <TrendingDown className="w-4 h-4 text-blue-500" />
           </div>
@@ -178,21 +206,21 @@ export default function DailyCountView({
             <span className="text-2xl font-bold text-blue-600">-{stats.totalOutputs}</span>
             <span className="text-xs text-slate-500">unidades</span>
           </div>
-          <div className="mt-2 text-[11px] text-blue-600 font-medium">
-            Baixas/Consumo registradas
+          <div className="mt-1.5 text-[11px] text-blue-600 font-medium">
+            Consumo / baixas registradas
           </div>
         </div>
       </div>
 
       {/* Filter and Search toolbar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3.5">
+      <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-3">
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-          {/* Search bar */}
+          {/* Search bar without code mention */}
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Buscar item por nome ou código (ex: Arroz, BEB-001)..."
+              placeholder="Buscar item pelo nome do produto..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
@@ -200,7 +228,7 @@ export default function DailyCountView({
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 bg-slate-200 px-1.5 py-0.5 rounded cursor-pointer"
               >
                 limpar
               </button>
@@ -211,9 +239,9 @@ export default function DailyCountView({
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
             <button
               onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 statusFilter === 'all'
-                  ? 'bg-slate-900 text-white shadow-sm'
+                  ? 'bg-slate-900 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -221,9 +249,9 @@ export default function DailyCountView({
             </button>
             <button
               onClick={() => setStatusFilter('pending')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 statusFilter === 'pending'
-                  ? 'bg-amber-600 text-white shadow-sm'
+                  ? 'bg-amber-600 text-white shadow-xs'
                   : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
               }`}
             >
@@ -231,9 +259,9 @@ export default function DailyCountView({
             </button>
             <button
               onClick={() => setStatusFilter('checked')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 statusFilter === 'checked'
-                  ? 'bg-emerald-600 text-white shadow-sm'
+                  ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
               }`}
             >
@@ -241,9 +269,9 @@ export default function DailyCountView({
             </button>
             <button
               onClick={() => setStatusFilter('divergence')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 statusFilter === 'divergence'
-                  ? 'bg-rose-600 text-white shadow-sm'
+                  ? 'bg-rose-600 text-white shadow-xs'
                   : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
               }`}
             >
@@ -260,9 +288,9 @@ export default function DailyCountView({
           </span>
           <button
             onClick={() => setSelectedCategory('TODAS')}
-            className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition ${
+            className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition cursor-pointer ${
               selectedCategory === 'TODAS'
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-blue-600 text-white shadow-xs'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
@@ -274,9 +302,9 @@ export default function DailyCountView({
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition ${
+                className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition cursor-pointer ${
                   selectedCategory === cat
-                    ? 'bg-blue-600 text-white shadow-sm'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
@@ -295,7 +323,7 @@ export default function DailyCountView({
           <div className="flex items-center gap-2">
             <button
               onClick={() => handleCheckAllVisible(true)}
-              className="text-xs text-emerald-700 hover:text-emerald-800 font-medium hover:underline flex items-center gap-1"
+              className="text-xs text-emerald-700 hover:text-emerald-800 font-medium hover:underline flex items-center gap-1 cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
               Marcar todos visíveis como conferidos
@@ -303,7 +331,7 @@ export default function DailyCountView({
             <span className="text-slate-300">|</span>
             <button
               onClick={() => handleCheckAllVisible(false)}
-              className="text-xs text-slate-500 hover:text-slate-700 font-medium hover:underline flex items-center gap-1"
+              className="text-xs text-slate-500 hover:text-slate-700 font-medium hover:underline flex items-center gap-1 cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Desmarcar todos
@@ -312,40 +340,59 @@ export default function DailyCountView({
         </div>
       </div>
 
-      {/* Main Count Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
+      {/* Main Count Table - Full Screen Width with Reordered Columns */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden w-full">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-sm border-collapse min-w-[1100px]">
             <thead>
-              <tr className="bg-slate-50/80 text-slate-600 font-semibold text-xs border-b border-slate-200">
-                <th className="py-3.5 px-4 text-center w-16">
-                  Check
-                </th>
-                <th className="py-3.5 px-4 min-w-[200px]">
-                  Item / Produto
-                </th>
-                <th className="py-3.5 px-3 text-center min-w-[90px]">
+              <tr className="bg-slate-50/90 text-slate-700 font-semibold text-xs border-b border-slate-200">
+                {/* 1. Categoria (Before Item/Produto) */}
+                <th className="py-3 px-3 text-left w-36">
                   Categoria
                 </th>
-                <th className="py-3.5 px-3 text-center min-w-[90px]">
+
+                {/* 2. Item / Produto (Clean, no SKU code) */}
+                <th className="py-3 px-3 min-w-[260px]">
+                  Item / Produto
+                </th>
+
+                {/* 3. Estoque Inicial */}
+                <th className="py-3 px-2 text-center w-24">
                   Estoque Inicial
                 </th>
-                <th className="py-3.5 px-3 text-center min-w-[100px] bg-emerald-50/40 text-emerald-900 border-x border-emerald-100">
+
+                {/* 4. Entradas (+) */}
+                <th className="py-3 px-2 text-center w-28 bg-emerald-50/50 text-emerald-950 border-x border-emerald-100">
                   Entradas (+)
                 </th>
-                <th className="py-3.5 px-3 text-center min-w-[100px] bg-blue-50/40 text-blue-900 border-r border-blue-100">
+
+                {/* 5. Saídas (-) */}
+                <th className="py-3 px-2 text-center w-28 bg-blue-50/50 text-blue-950 border-r border-blue-100">
                   Saídas (-)
                 </th>
-                <th className="py-3.5 px-3 text-center min-w-[100px]">
-                  Estoque Esperado
+
+                {/* 6. Estoque Geral (Renamed as requested in Image 2) */}
+                <th className="py-3 px-2 text-center w-28 font-bold text-slate-900 bg-slate-100/60">
+                  Estoque Geral
                 </th>
-                <th className="py-3.5 px-3 text-center min-w-[130px] bg-amber-50/50 text-amber-900 font-bold border-x border-amber-200">
+
+                {/* 7. Última Contagem */}
+                <th className="py-3 px-2 text-center w-36 bg-amber-50/60 text-amber-950 font-bold border-x border-amber-200">
                   Última Contagem
                 </th>
-                <th className="py-3.5 px-3 text-center min-w-[110px]">
+
+                {/* 8. Diferença */}
+                <th className="py-3 px-2 text-center w-32">
                   Diferença
                 </th>
-                <th className="py-3.5 px-4 min-w-[160px]">
+
+                {/* 9. Check (Beside Diferença!) */}
+                <th className="py-3 px-2 text-center w-20 bg-slate-50/50 border-x border-slate-200">
+                  Check
+                </th>
+
+                {/* 10. Conferente / Horário */}
+                <th className="py-3 px-4 min-w-[180px]">
                   Conferente / Horário
                 </th>
               </tr>
@@ -377,25 +424,130 @@ export default function DailyCountView({
                   const currentStock = Number(item.currentStock ?? product.currentStock) || 0;
                   const entries = Number(item.entries) || 0;
                   const outputCount = Number(item.outputCount) || 0;
-                  const expectedStock = currentStock + entries - outputCount;
+                  const estoqueGeral = currentStock + entries - outputCount;
                   const hasCount = item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '';
                   const countedStock = hasCount ? Number(item.countedStock) : '';
-                  const diff = hasCount ? (Number(countedStock) - expectedStock) : 0;
+                  const diff = hasCount ? (Number(countedStock) - estoqueGeral) : 0;
                   const isChecked = !!item.checked;
 
                   return (
                     <tr
                       key={product.id}
-                      className={`transition-colors hover:bg-slate-50/80 ${
-                        isChecked ? 'bg-emerald-50/20' : ''
+                      className={`transition-colors hover:bg-slate-50/90 ${
+                        isChecked ? 'bg-emerald-50/25' : ''
                       }`}
                     >
-                      {/* Check Button */}
-                      <td className="py-3 px-4 text-center">
+                      {/* 1. Categoria (Before Product) */}
+                      <td className="py-2.5 px-3">
+                        <span className="inline-block text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md whitespace-nowrap">
+                          {product.category}
+                        </span>
+                      </td>
+
+                      {/* 2. Item / Produto (Clean Name and Unit only - SKU code removed as in image 1) */}
+                      <td className="py-2.5 px-3">
+                        <div className="font-semibold text-slate-900 leading-snug">
+                          {product.name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                          Un: {product.unit || 'UN'}
+                        </div>
+                      </td>
+
+                      {/* 3. Estoque Inicial (Chain rule: yesterday's counted stock) */}
+                      <td className="py-2.5 px-2 text-center font-semibold text-slate-800">
+                        {currentStock}
+                      </td>
+
+                      {/* 4. Entradas (+) */}
+                      <td className="py-2.5 px-2 text-center bg-emerald-50/20 border-x border-emerald-100/50">
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.entries === 0 ? '' : item.entries}
+                          placeholder="0"
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            onUpdateItem(product.id, { entries: val });
+                          }}
+                          className="w-18 mx-auto text-center font-bold text-emerald-800 bg-white border border-emerald-200 rounded-md py-1 px-1 focus:ring-2 focus:ring-emerald-500 focus:outline-none shadow-2xs text-sm"
+                        />
+                      </td>
+
+                      {/* 5. Saídas (-) */}
+                      <td className="py-2.5 px-2 text-center bg-blue-50/20 border-r border-blue-100/50">
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.outputCount === 0 ? '' : item.outputCount}
+                          placeholder="0"
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Number(e.target.value);
+                            onUpdateItem(product.id, { outputCount: val });
+                          }}
+                          className="w-18 mx-auto text-center font-bold text-blue-800 bg-white border border-blue-200 rounded-md py-1 px-1 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-2xs text-sm"
+                        />
+                      </td>
+
+                      {/* 6. Estoque Geral (Renamed from Estoque Esperado) */}
+                      <td className="py-2.5 px-2 text-center font-bold text-slate-900 bg-slate-100/40">
+                        <span className="inline-block bg-slate-200/70 text-slate-900 px-2.5 py-1 rounded-md text-xs font-mono font-bold">
+                          {estoqueGeral}
+                        </span>
+                      </td>
+
+                      {/* 7. Última Contagem (Physical Count) */}
+                      <td className="py-2.5 px-2 text-center bg-amber-50/30 border-x border-amber-200/60">
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.countedStock === null || item.countedStock === undefined ? '' : item.countedStock}
+                          placeholder="Digitar..."
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? null : Number(e.target.value);
+                            onUpdateItem(product.id, { 
+                              countedStock: val,
+                              checked: val !== null ? true : item.checked
+                            });
+                          }}
+                          className={`w-24 mx-auto text-center font-bold text-base rounded-lg py-1.5 px-2 border focus:outline-none focus:ring-2 transition shadow-xs ${
+                            hasCount
+                              ? 'bg-white border-amber-400 text-slate-900 ring-1 ring-amber-300'
+                              : 'bg-white border-slate-300 text-slate-500 hover:border-amber-400'
+                          }`}
+                        />
+                      </td>
+
+                      {/* 8. Diferença */}
+                      <td className="py-2.5 px-2 text-center">
+                        {!hasCount ? (
+                          <span className="text-xs text-slate-400 font-medium italic">
+                            Não contado
+                          </span>
+                        ) : diff === 0 ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-md">
+                            <Check className="w-3.5 h-3.5" />
+                            0 (OK)
+                          </span>
+                        ) : diff > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-100 border border-blue-300 px-2 py-0.5 rounded-md">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            +{diff} (Sobra)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-md animate-pulse-subtle">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            {diff} (Falta)
+                          </span>
+                        )}
+                      </td>
+
+                      {/* 9. Check Button (Placed right next to Diferença!) */}
+                      <td className="py-2.5 px-2 text-center bg-slate-50/40 border-x border-slate-200/80">
                         <button
                           type="button"
                           onClick={() => onToggleCheck(product.id, !isChecked)}
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                          className={`w-8 h-8 rounded-lg mx-auto flex items-center justify-center transition-all cursor-pointer ${
                             isChecked
                               ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30 scale-105 hover:bg-emerald-700'
                               : 'bg-white border-2 border-slate-300 text-transparent hover:border-emerald-500 hover:text-emerald-500/50'
@@ -406,124 +558,13 @@ export default function DailyCountView({
                         </button>
                       </td>
 
-                      {/* Product Name & Code */}
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-800 leading-tight">
-                          {product.name}
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="font-mono text-[11px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                            {product.code || 'S/C'}
-                          </span>
-                          <span className="text-[11px] text-slate-500">
-                            Un: <strong className="font-medium text-slate-700">{product.unit || 'UN'}</strong>
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Category Badge */}
-                      <td className="py-3 px-3 text-center">
-                        <span className="inline-block text-[11px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">
-                          {product.category}
-                        </span>
-                      </td>
-
-                      {/* Initial / System Stock */}
-                      <td className="py-3 px-3 text-center font-medium text-slate-700">
-                        {currentStock}
-                      </td>
-
-                      {/* Entries Input */}
-                      <td className="py-3 px-3 text-center bg-emerald-50/20 border-x border-emerald-100/50">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.entries === 0 ? '' : item.entries}
-                          placeholder="0"
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? 0 : Number(e.target.value);
-                            onUpdateItem(product.id, { entries: val });
-                          }}
-                          className="w-18 mx-auto text-center font-semibold text-emerald-800 bg-white border border-emerald-200 rounded-md py-1 px-1 focus:ring-2 focus:ring-emerald-500 focus:outline-none shadow-xs text-sm"
-                        />
-                      </td>
-
-                      {/* Outputs Input */}
-                      <td className="py-3 px-3 text-center bg-blue-50/20 border-r border-blue-100/50">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.outputCount === 0 ? '' : item.outputCount}
-                          placeholder="0"
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? 0 : Number(e.target.value);
-                            onUpdateItem(product.id, { outputCount: val });
-                          }}
-                          className="w-18 mx-auto text-center font-semibold text-blue-800 bg-white border border-blue-200 rounded-md py-1 px-1 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-xs text-sm"
-                        />
-                      </td>
-
-                      {/* Expected Stock (Calculated) */}
-                      <td className="py-3 px-3 text-center font-semibold text-slate-800">
-                        <span className="bg-slate-100 px-2 py-1 rounded text-xs">
-                          {expectedStock}
-                        </span>
-                      </td>
-
-                      {/* Physical Count (Última Contagem) with prominent styling and auto-save */}
-                      <td className="py-3 px-3 text-center bg-amber-50/30 border-x border-amber-200/60">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.countedStock === null || item.countedStock === undefined ? '' : item.countedStock}
-                          placeholder="Digitar..."
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? null : Number(e.target.value);
-                            // Auto-saves immediately upon typing, and auto-marks check if desired or marks counted
-                            onUpdateItem(product.id, { 
-                              countedStock: val,
-                              checked: val !== null ? true : item.checked // auto-check when count is typed
-                            });
-                          }}
-                          className={`w-24 mx-auto text-center font-bold text-base rounded-lg py-1.5 px-2 border focus:outline-none focus:ring-2 transition shadow-sm ${
-                            hasCount
-                              ? 'bg-white border-amber-400 text-slate-900 ring-1 ring-amber-300'
-                              : 'bg-white border-slate-300 text-slate-500 hover:border-amber-400'
-                          }`}
-                        />
-                      </td>
-
-                      {/* Difference Badge */}
-                      <td className="py-3 px-3 text-center">
-                        {!hasCount ? (
-                          <span className="text-xs text-slate-400 font-medium italic">
-                            Não contado
-                          </span>
-                        ) : diff === 0 ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100/80 border border-emerald-300 px-2.5 py-1 rounded-full">
-                            <Check className="w-3.5 h-3.5" />
-                            0 (OK)
-                          </span>
-                        ) : diff > 0 ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-100 border border-blue-300 px-2.5 py-1 rounded-full">
-                            <TrendingUp className="w-3.5 h-3.5" />
-                            +{diff} (Sobra)
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-100 border border-rose-300 px-2.5 py-1 rounded-full animate-pulse-subtle">
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            {diff} (Falta)
-                          </span>
-                        )}
-                      </td>
-
-                      {/* User selector per item & check time */}
-                      <td className="py-3 px-4">
+                      {/* 10. Conferente / Horário */}
+                      <td className="py-2.5 px-4">
                         <div className="flex flex-col gap-1">
                           <select
                             value={item.countedBy || currentUser.name}
                             onChange={(e) => onUpdateItem(product.id, { countedBy: e.target.value })}
-                            className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                            className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium cursor-pointer"
                           >
                             {users.map(u => (
                               <option key={u.id} value={u.name}>
@@ -553,7 +594,7 @@ export default function DailyCountView({
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-blue-500" />
             <span>
-              <strong>Dica:</strong> A contagem física, entradas e saídas são salvas automaticamente assim que você digita.
+              <strong>Dica:</strong> A última contagem deste dia se tornará o estoque inicial do dia seguinte automaticamente.
             </span>
           </div>
           <div className="flex items-center gap-4 font-semibold text-slate-700">
@@ -565,4 +606,3 @@ export default function DailyCountView({
     </div>
   );
 }
-

@@ -28,8 +28,8 @@ function getTodayString() {
   return `${year}-${month}-${day}`;
 }
 
-// Generate some sample historical counts
-function generateInitialHistory(products, users) {
+// Generate sample history for a location
+function generateLocationHistory(products, users, locationMultiplier = 1) {
   const history = {};
   const today = new Date();
 
@@ -40,17 +40,20 @@ function generateInitialHistory(products, users) {
 
     const items = {};
     products.forEach((p, idx) => {
-      const baseStock = p.currentStock;
-      const entries = idx % 5 === 0 ? 10 : 0;
-      const outputCount = (idx % 2 === 0) ? Math.floor(Math.random() * 8) + 1 : Math.floor(Math.random() * 4);
+      // Deposito has more stock than loja
+      const baseStock = Math.round(p.currentStock * locationMultiplier);
+      const entries = idx % 5 === 0 ? 10 * locationMultiplier : 0;
+      const outputCount = (idx % 2 === 0) ? Math.floor(Math.random() * 6) + 1 : Math.floor(Math.random() * 3);
       const expected = baseStock + entries - outputCount;
       const diff = idx === 12 ? -1 : (idx === 25 ? 1 : 0);
+      const countedStock = expected + diff;
+
       items[p.id] = {
         productId: p.id,
         currentStock: baseStock,
         entries: entries,
         outputCount: outputCount,
-        countedStock: expected + diff,
+        countedStock: countedStock,
         difference: diff,
         checked: true,
         checkedAt: new Date(d.setHours(17, 30, 0)).toISOString(),
@@ -66,18 +69,28 @@ function generateInitialHistory(products, users) {
     };
   }
 
+  // Today's count
   const todayStr = getTodayString();
   const todayItems = {};
   products.forEach((p, idx) => {
     const isDone = idx < 15;
+    // Chain rule: initial stock of today is the counted stock of yesterday
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yestStr = yesterday.toISOString().split('T')[0];
+    const prevCounted = history[yestStr]?.items?.[p.id]?.countedStock;
+    const baseStock = prevCounted !== null && prevCounted !== undefined 
+      ? prevCounted 
+      : Math.round(p.currentStock * locationMultiplier);
+
     const entries = idx % 6 === 0 ? 12 : 0;
     const outputCount = isDone ? Math.floor(Math.random() * 5) + 1 : 0;
-    const expected = p.currentStock + entries - outputCount;
+    const expected = baseStock + entries - outputCount;
     const countedStock = isDone ? expected : null;
 
     todayItems[p.id] = {
       productId: p.id,
-      currentStock: p.currentStock,
+      currentStock: baseStock,
       entries: entries,
       outputCount: outputCount,
       countedStock: countedStock,
@@ -98,23 +111,80 @@ function generateInitialHistory(products, users) {
   return history;
 }
 
+// Find previous day's counted stock for a product
+function getPreviousDayCountedStock(locationCounts, targetDateStr, productId, defaultStock) {
+  if (!locationCounts) return defaultStock;
+  const priorDates = Object.keys(locationCounts)
+    .filter(d => d < targetDateStr)
+    .sort((a, b) => b.localeCompare(a)); // Descending order (closest previous day first)
+
+  if (priorDates.length > 0) {
+    const prevDate = priorDates[0];
+    const prevItem = locationCounts[prevDate]?.items?.[productId];
+    if (prevItem) {
+      if (prevItem.countedStock !== null && prevItem.countedStock !== undefined && prevItem.countedStock !== '') {
+        return Number(prevItem.countedStock);
+      }
+      // If not physically counted, use the previous day's Estoque Geral
+      const exp = (Number(prevItem.currentStock) || 0) + (Number(prevItem.entries) || 0) - (Number(prevItem.outputCount) || 0);
+      return exp;
+    }
+  }
+
+  return defaultStock;
+}
+
+// Propagate countedStock to next day if next day exists
+function propagateToNextDay(locationCounts, currentDateStr, productId, newCountedStock) {
+  if (!locationCounts || newCountedStock === null || newCountedStock === undefined) return;
+  const futureDates = Object.keys(locationCounts)
+    .filter(d => d > currentDateStr)
+    .sort((a, b) => a.localeCompare(b)); // Ascending order (closest next day first)
+
+  if (futureDates.length > 0) {
+    const nextDate = futureDates[0];
+    const nextItem = locationCounts[nextDate]?.items?.[productId];
+    if (nextItem) {
+      nextItem.currentStock = Number(newCountedStock);
+      // Recalculate difference for next day
+      const expected = nextItem.currentStock + (Number(nextItem.entries) || 0) - (Number(nextItem.outputCount) || 0);
+      if (nextItem.countedStock !== null && nextItem.countedStock !== undefined && nextItem.countedStock !== '') {
+        nextItem.difference = Number(nextItem.countedStock) - expected;
+      }
+    }
+  }
+}
+
 // Load or initialize DB
 function loadDatabase() {
   try {
     if (fs.existsSync(DB_FILE)) {
       const data = fs.readFileSync(DB_FILE, 'utf8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      // Ensure structure has loja and deposito
+      if (!parsed.counts || !parsed.counts.loja) {
+        parsed.counts = {
+          loja: parsed.counts || {},
+          deposito: generateLocationHistory(parsed.products || initialProducts, parsed.users || initialUsers, 2.5)
+        };
+      }
+      if (!parsed.counts.deposito) {
+        parsed.counts.deposito = generateLocationHistory(parsed.products || initialProducts, parsed.users || initialUsers, 2.5);
+      }
+      return parsed;
     }
   } catch (err) {
     console.error('Error reading db.json:', err);
   }
 
-  const initialHistory = generateInitialHistory(initialProducts, initialUsers);
   const initialData = {
     products: initialProducts,
     categories: initialCategories,
     users: initialUsers,
-    counts: initialHistory
+    counts: {
+      loja: generateLocationHistory(initialProducts, initialUsers, 1),
+      deposito: generateLocationHistory(initialProducts, initialUsers, 2.5)
+    }
   };
 
   saveDatabase(initialData);
@@ -141,14 +211,30 @@ app.get('/api/data', (req, res) => {
   res.json(db);
 });
 
+// Get count session for date & location
 app.get('/api/counts/:date', (req, res) => {
   const { date } = req.params;
-  if (!db.counts[date]) {
+  const location = req.query.location === 'deposito' ? 'deposito' : 'loja';
+
+  if (!db.counts[location]) {
+    db.counts[location] = {};
+  }
+
+  if (!db.counts[location][date]) {
     const items = {};
+    const mult = location === 'deposito' ? 2.5 : 1;
     db.products.forEach(p => {
+      // Chained rule: initial stock of this date is the counted stock of previous day
+      const initialStock = getPreviousDayCountedStock(
+        db.counts[location],
+        date,
+        p.id,
+        Math.round(p.currentStock * mult)
+      );
+
       items[p.id] = {
         productId: p.id,
-        currentStock: p.currentStock,
+        currentStock: initialStock,
         entries: 0,
         outputCount: 0,
         countedStock: null,
@@ -160,27 +246,35 @@ app.get('/api/counts/:date', (req, res) => {
       };
     });
 
-    db.counts[date] = {
+    db.counts[location][date] = {
       date,
+      location,
       defaultUserId: db.users[0]?.id || '',
       items
     };
     saveDatabase(db);
   }
 
-  res.json(db.counts[date]);
+  res.json(db.counts[location][date]);
 });
 
+// Auto-save item count
 app.post('/api/counts/save-item', (req, res) => {
-  const { date, productId, currentStock, entries, outputCount, countedStock, checked, countedBy } = req.body;
+  const { date, productId, currentStock, entries, outputCount, countedStock, checked, countedBy, location = 'loja' } = req.body;
+  const loc = location === 'deposito' ? 'deposito' : 'loja';
 
   if (!date || !productId) {
     return res.status(400).json({ error: 'Date and productId are required' });
   }
 
-  if (!db.counts[date]) {
-    db.counts[date] = {
+  if (!db.counts[loc]) {
+    db.counts[loc] = {};
+  }
+
+  if (!db.counts[loc][date]) {
+    db.counts[loc][date] = {
       date,
+      location: loc,
       defaultUserId: db.users[0]?.id || '',
       items: {}
     };
@@ -192,10 +286,11 @@ app.post('/api/counts/save-item', (req, res) => {
   const hasCount = countedStock !== null && countedStock !== undefined && countedStock !== '';
   const numCounted = hasCount ? Number(countedStock) : null;
 
+  // Estoque Geral = initial stock + entries - output
   const expectedStock = numCurrent + numEntries - numOutput;
   const difference = hasCount ? (numCounted - expectedStock) : 0;
 
-  const prevItem = db.counts[date].items[productId] || {};
+  const prevItem = db.counts[loc][date].items[productId] || {};
   const isChecked = checked !== undefined ? checked : prevItem.checked || false;
 
   const updatedItem = {
@@ -211,19 +306,26 @@ app.post('/api/counts/save-item', (req, res) => {
     lastModified: new Date().toISOString()
   };
 
-  db.counts[date].items[productId] = updatedItem;
-  saveDatabase(db);
+  db.counts[loc][date].items[productId] = updatedItem;
 
-  res.json({ success: true, item: updatedItem, date });
+  // Chain rule: if countedStock is provided, propagate as initial stock of the next day!
+  if (hasCount) {
+    propagateToNextDay(db.counts[loc], date, productId, numCounted);
+  }
+
+  saveDatabase(db);
+  res.json({ success: true, item: updatedItem, date, location: loc });
 });
 
 app.post('/api/counts/toggle-check', (req, res) => {
-  const { date, productId, checked, countedBy } = req.body;
-  if (!db.counts[date] || !db.counts[date].items[productId]) {
+  const { date, productId, checked, countedBy, location = 'loja' } = req.body;
+  const loc = location === 'deposito' ? 'deposito' : 'loja';
+
+  if (!db.counts[loc] || !db.counts[loc][date] || !db.counts[loc][date].items[productId]) {
     return res.status(404).json({ error: 'Item count not found' });
   }
 
-  const item = db.counts[date].items[productId];
+  const item = db.counts[loc][date].items[productId];
   item.checked = checked;
   item.checkedAt = checked ? new Date().toISOString() : null;
   if (countedBy) {
@@ -236,20 +338,22 @@ app.post('/api/counts/toggle-check', (req, res) => {
 });
 
 app.post('/api/counts/batch-check', (req, res) => {
-  const { date, productIds, checked, countedBy } = req.body;
-  if (!db.counts[date]) {
+  const { date, productIds, checked, countedBy, location = 'loja' } = req.body;
+  const loc = location === 'deposito' ? 'deposito' : 'loja';
+
+  if (!db.counts[loc] || !db.counts[loc][date]) {
     return res.status(404).json({ error: 'Date not found' });
   }
 
   const now = new Date().toISOString();
   productIds.forEach(pId => {
-    if (db.counts[date].items[pId]) {
-      db.counts[date].items[pId].checked = checked;
-      db.counts[date].items[pId].checkedAt = checked ? now : null;
+    if (db.counts[loc][date].items[pId]) {
+      db.counts[loc][date].items[pId].checked = checked;
+      db.counts[loc][date].items[pId].checkedAt = checked ? now : null;
       if (countedBy) {
-        db.counts[date].items[pId].countedBy = countedBy;
+        db.counts[loc][date].items[pId].countedBy = countedBy;
       }
-      db.counts[date].items[pId].lastModified = now;
+      db.counts[loc][date].items[pId].lastModified = now;
     }
   });
 
@@ -332,7 +436,10 @@ app.post('/api/reset-demo', (req, res) => {
     products: initialProducts,
     categories: initialCategories,
     users: initialUsers,
-    counts: generateInitialHistory(initialProducts, initialUsers)
+    counts: {
+      loja: generateLocationHistory(initialProducts, initialUsers, 1),
+      deposito: generateLocationHistory(initialProducts, initialUsers, 2.5)
+    }
   };
   saveDatabase(db);
   res.json({ success: true, message: 'Dados de demonstração restaurados com sucesso!' });

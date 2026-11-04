@@ -9,8 +9,9 @@ import {
   CheckCircle2, 
   Loader2, 
   Clock, 
-  Sparkles,
-  Boxes
+  Warehouse,
+  Boxes,
+  Store
 } from 'lucide-react';
 import { formatDateBR } from '../utils/formatters';
 
@@ -26,34 +27,35 @@ export default function Header({
   onOpenProducts,
   onOpenUsers,
   onOpenExport,
-  summaryStats
+  summaryStats,
+  depositoStats
 }) {
   const currentUser = users.find(u => u.id === currentUserId) || users[0];
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs w-full">
+      <div className="w-full px-3 sm:px-5 lg:px-6">
         {/* Top bar */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between py-3 border-b border-slate-100 gap-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between py-2.5 border-b border-slate-100 gap-3">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-tr from-blue-700 to-indigo-600 p-2.5 rounded-xl text-white shadow-md shadow-blue-500/20">
-              <Boxes className="w-6 h-6" />
+            <div className="bg-gradient-to-tr from-blue-700 to-indigo-600 p-2 rounded-xl text-white shadow-md shadow-blue-500/20">
+              <Boxes className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">Estoque Diário Pro</h1>
+                <h1 className="text-lg font-bold text-slate-900 tracking-tight">Estoque Diário Pro</h1>
                 <span className="text-[11px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
-                  v1.0
+                  v2.0
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                Contagem física, conferência com check, saídas e divergências em tempo real
+                Controle diário da Loja e Depósito com contagem física, conferência e divergências
               </p>
             </div>
           </div>
 
           {/* Right Top Actions */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Auto-save visual indicator */}
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-50 border border-slate-200">
               {saveStatus === 'saving' ? (
@@ -75,7 +77,7 @@ export default function Header({
             </div>
 
             {/* User Selector */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
               <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
                 <Users className="w-3.5 h-3.5 text-slate-400" />
                 Conferente:
@@ -96,7 +98,7 @@ export default function Header({
             {/* Quick Action Modals */}
             <button
               onClick={onOpenProducts}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-sm"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-2xs cursor-pointer"
               title="Cadastrar ou editar produtos e categorias"
             >
               <PackagePlus className="w-3.5 h-3.5 text-slate-500" />
@@ -105,7 +107,7 @@ export default function Header({
 
             <button
               onClick={onOpenUsers}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-sm"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition shadow-2xs cursor-pointer"
               title="Gerenciar usuários e conferentes"
             >
               <Users className="w-3.5 h-3.5 text-slate-500" />
@@ -114,7 +116,7 @@ export default function Header({
 
             <button
               onClick={onOpenExport}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition shadow-sm"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition shadow-2xs cursor-pointer"
               title="Exportar dados da contagem para Excel/CSV"
             >
               <Download className="w-3.5 h-3.5 text-blue-600" />
@@ -123,22 +125,23 @@ export default function Header({
           </div>
         </div>
 
-        {/* Bottom bar: Navigation Tabs & Date selector */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 gap-3">
-          <nav className="flex space-x-1 sm:space-x-2">
+        {/* Bottom bar: Navigation Tabs (Loja, Depósito, Dashboard) & Date selector */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 gap-2.5">
+          <nav className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Loja / Frente */}
             <button
               onClick={() => setActiveTab('count')}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
                 activeTab === 'count'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                  ? 'bg-blue-600 text-white shadow-xs shadow-blue-500/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
-              <ClipboardCheck className="w-4 h-4" />
-              <span>Contagem Diária</span>
+              <Store className="w-4 h-4" />
+              <span>Loja / Frente</span>
               {summaryStats && (
                 <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                  className={`text-[11px] px-2 py-0.2 rounded-full font-bold ${
                     activeTab === 'count'
                       ? 'bg-blue-500 text-white'
                       : 'bg-slate-200 text-slate-700'
@@ -149,27 +152,41 @@ export default function Header({
               )}
             </button>
 
+            {/* Depósito Menu Button */}
+            <button
+              onClick={() => setActiveTab('deposito')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                activeTab === 'deposito'
+                  ? 'bg-amber-600 text-white shadow-xs shadow-amber-500/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Warehouse className="w-4 h-4" />
+              <span>Depósito</span>
+              {depositoStats && (
+                <span
+                  className={`text-[11px] px-2 py-0.2 rounded-full font-bold ${
+                    activeTab === 'deposito'
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {depositoStats.checkedCount}/{depositoStats.totalItems}
+                </span>
+              )}
+            </button>
+
+            {/* Dashboard */}
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
                 activeTab === 'dashboard'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/20'
+                  ? 'bg-blue-600 text-white shadow-xs shadow-blue-500/20'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               <BarChart3 className="w-4 h-4" />
               <span>Dashboard de Saídas</span>
-              {summaryStats && summaryStats.totalOutputToday > 0 && (
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                    activeTab === 'dashboard'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-emerald-100 text-emerald-800'
-                  }`}
-                >
-                  {summaryStats.totalOutputToday} saídas
-                </span>
-              )}
             </button>
           </nav>
 
@@ -177,13 +194,13 @@ export default function Header({
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              Data da Contagem:
+              Data:
             </span>
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm cursor-pointer"
+              className="bg-white border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-2xs cursor-pointer"
             />
           </div>
         </div>
@@ -191,4 +208,3 @@ export default function Header({
     </header>
   );
 }
-

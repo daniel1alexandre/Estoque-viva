@@ -10,12 +10,13 @@ import { getTodayDateString } from './utils/formatters';
 const API_BASE = '/api';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('count'); // 'count' | 'dashboard'
+  const [activeTab, setActiveTab] = useState('count'); // 'count' (loja) | 'deposito' | 'dashboard'
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
-  const [countsHistory, setCountsHistory] = useState({});
+  // Structure: { loja: { [date]: session }, deposito: { [date]: session } }
+  const [countsHistory, setCountsHistory] = useState({ loja: {}, deposito: {} });
   const [currentUserId, setCurrentUserId] = useState('');
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
   const [loading, setLoading] = useState(true);
@@ -25,8 +26,10 @@ export default function App() {
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
-  // Debounce timers map for auto-saving
   const saveTimeoutsRef = useRef({});
+
+  // Active location: 'loja' or 'deposito'
+  const currentLocation = activeTab === 'deposito' ? 'deposito' : 'loja';
 
   // Fetch full data on initial mount
   useEffect(() => {
@@ -38,11 +41,24 @@ export default function App() {
         setProducts(data.products || []);
         setCategories(data.categories || []);
         setUsers(data.users || []);
-        setCountsHistory(data.counts || {});
+
+        // Format counts safely
+        let normalizedCounts = { loja: {}, deposito: {} };
+        if (data.counts) {
+          if (data.counts.loja || data.counts.deposito) {
+            normalizedCounts = {
+              loja: data.counts.loja || {},
+              deposito: data.counts.deposito || {}
+            };
+          } else {
+            normalizedCounts.loja = data.counts;
+          }
+        }
+        setCountsHistory(normalizedCounts);
+
         if (data.users && data.users.length > 0) {
           setCurrentUserId(data.users[0].id);
         }
-        // Save to local cache as backup
         localStorage.setItem('estoque_backup_data', JSON.stringify(data));
       } catch (err) {
         console.warn('Backend indisponível, usando armazenamento local fallback:', err);
@@ -53,7 +69,18 @@ export default function App() {
             setProducts(data.products || []);
             setCategories(data.categories || []);
             setUsers(data.users || []);
-            setCountsHistory(data.counts || {});
+            let normalizedCounts = { loja: {}, deposito: {} };
+            if (data.counts) {
+              if (data.counts.loja || data.counts.deposito) {
+                normalizedCounts = {
+                  loja: data.counts.loja || {},
+                  deposito: data.counts.deposito || {}
+                };
+              } else {
+                normalizedCounts.loja = data.counts;
+              }
+            }
+            setCountsHistory(normalizedCounts);
             if (data.users && data.users.length > 0) {
               setCurrentUserId(data.users[0].id);
             }
@@ -68,17 +95,48 @@ export default function App() {
     loadData();
   }, []);
 
-  // Ensure count session exists for the selectedDate
+  // Helper: Find previous day's counted stock for a product in a location
+  const getPrevCountedStock = useCallback((location, targetDateStr, productId, defaultVal) => {
+    const locCounts = countsHistory[location] || {};
+    const priorDates = Object.keys(locCounts)
+      .filter(d => d < targetDateStr)
+      .sort((a, b) => b.localeCompare(a)); // Descending: closest previous day first
+
+    if (priorDates.length > 0) {
+      const prevDate = priorDates[0];
+      const prevItem = locCounts[prevDate]?.items?.[productId];
+      if (prevItem) {
+        if (prevItem.countedStock !== null && prevItem.countedStock !== undefined && prevItem.countedStock !== '') {
+          return Number(prevItem.countedStock);
+        }
+        // Fallback to Estoque Geral of that previous day
+        return (Number(prevItem.currentStock) || 0) + (Number(prevItem.entries) || 0) - (Number(prevItem.outputCount) || 0);
+      }
+    }
+    return defaultVal;
+  }, [countsHistory]);
+
+  // Ensure count session exists for current location & selectedDate
   useEffect(() => {
     if (!loading && products.length > 0) {
-      if (!countsHistory[selectedDate]) {
-        // Initialize day in local state & server
+      const locCounts = countsHistory[currentLocation] || {};
+      if (!locCounts[selectedDate]) {
         const defaultUser = users.find(u => u.id === currentUserId) || users[0];
         const newItems = {};
+        const mult = currentLocation === 'deposito' ? 2.5 : 1;
+
         products.forEach(p => {
+          // Chain rule: initial stock of today is the counted stock of yesterday
+          const initialStock = getPrevCountedStock(
+            currentLocation,
+            selectedDate,
+            p.id,
+            Math.round(p.currentStock * mult)
+          );
+
           newItems[p.id] = {
             productId: p.id,
-            currentStock: p.currentStock,
+            currentStock: initialStock,
             entries: 0,
             outputCount: 0,
             countedStock: null,
@@ -92,32 +150,37 @@ export default function App() {
 
         const newSession = {
           date: selectedDate,
+          location: currentLocation,
           defaultUserId: currentUserId,
           items: newItems
         };
 
         setCountsHistory(prev => ({
           ...prev,
-          [selectedDate]: newSession
+          [currentLocation]: {
+            ...(prev[currentLocation] || {}),
+            [selectedDate]: newSession
+          }
         }));
 
-        // Inform backend
-        fetch(`${API_BASE}/counts/${selectedDate}`).catch(console.error);
+        fetch(`${API_BASE}/counts/${selectedDate}?location=${currentLocation}`).catch(console.error);
       }
     }
-  }, [selectedDate, loading, products, users, currentUserId, countsHistory]);
+  }, [selectedDate, currentLocation, loading, products, users, currentUserId, countsHistory, getPrevCountedStock]);
 
   // Current session count data
-  const currentCountData = countsHistory[selectedDate] || {
+  const currentCountData = (countsHistory[currentLocation] && countsHistory[currentLocation][selectedDate]) || {
     date: selectedDate,
+    location: currentLocation,
     defaultUserId: currentUserId,
     items: {}
   };
 
   // Immediate local update + debounced auto-save to backend
   const handleUpdateItem = useCallback((productId, partialChanges) => {
+    const loc = currentLocation;
     const currentUser = users.find(u => u.id === currentUserId) || users[0];
-    const prevSession = countsHistory[selectedDate] || { date: selectedDate, items: {} };
+    const prevSession = (countsHistory[loc] && countsHistory[loc][selectedDate]) || { date: selectedDate, items: {} };
     const prevItem = prevSession.items[productId] || {
       productId,
       currentStock: products.find(p => p.id === productId)?.currentStock || 0,
@@ -135,41 +198,77 @@ export default function App() {
       lastModified: new Date().toISOString()
     };
 
-    // Recalculate difference
+    // Recalculate difference: countedStock - (currentStock + entries - outputCount)
     const numCurrent = Number(updatedItem.currentStock) || 0;
     const numEntries = Number(updatedItem.entries) || 0;
     const numOutput = Number(updatedItem.outputCount) || 0;
     const hasCount = updatedItem.countedStock !== null && updatedItem.countedStock !== undefined && updatedItem.countedStock !== '';
-    const expected = numCurrent + numEntries - numOutput;
-    updatedItem.difference = hasCount ? (Number(updatedItem.countedStock) - expected) : 0;
+    const estoqueGeral = numCurrent + numEntries - numOutput;
+    updatedItem.difference = hasCount ? (Number(updatedItem.countedStock) - estoqueGeral) : 0;
 
-    // Update UI state immediately with no lag
-    setCountsHistory(prev => ({
-      ...prev,
-      [selectedDate]: {
-        ...prev[selectedDate],
-        items: {
-          ...(prev[selectedDate]?.items || {}),
-          [productId]: updatedItem
+    // Update UI state immediately
+    setCountsHistory(prev => {
+      const locSessions = prev[loc] || {};
+      const currentSess = locSessions[selectedDate] || { date: selectedDate, items: {} };
+      const updatedLoc = {
+        ...locSessions,
+        [selectedDate]: {
+          ...currentSess,
+          items: {
+            ...currentSess.items,
+            [productId]: updatedItem
+          }
+        }
+      };
+
+      // Chain rule: if countedStock was changed, propagate to the immediately following date as its initial stock!
+      if (hasCount) {
+        const futureDates = Object.keys(updatedLoc)
+          .filter(d => d > selectedDate)
+          .sort((a, b) => a.localeCompare(b));
+
+        if (futureDates.length > 0) {
+          const nextDate = futureDates[0];
+          const nextSess = updatedLoc[nextDate];
+          if (nextSess && nextSess.items && nextSess.items[productId]) {
+            const nextIt = { ...nextSess.items[productId] };
+            nextIt.currentStock = Number(updatedItem.countedStock);
+            const nextGeral = nextIt.currentStock + (Number(nextIt.entries) || 0) - (Number(nextIt.outputCount) || 0);
+            if (nextIt.countedStock !== null && nextIt.countedStock !== undefined && nextIt.countedStock !== '') {
+              nextIt.difference = Number(nextIt.countedStock) - nextGeral;
+            }
+            updatedLoc[nextDate] = {
+              ...nextSess,
+              items: {
+                ...nextSess.items,
+                [productId]: nextIt
+              }
+            };
+          }
         }
       }
-    }));
 
-    // Trigger visual saving status
+      return {
+        ...prev,
+        [loc]: updatedLoc
+      };
+    });
+
     setSaveStatus('saving');
 
-    // Debounce backend request by 350ms
-    if (saveTimeoutsRef.current[productId]) {
-      clearTimeout(saveTimeoutsRef.current[productId]);
+    const timerKey = `${loc}_${productId}`;
+    if (saveTimeoutsRef.current[timerKey]) {
+      clearTimeout(saveTimeoutsRef.current[timerKey]);
     }
 
-    saveTimeoutsRef.current[productId] = setTimeout(async () => {
+    saveTimeoutsRef.current[timerKey] = setTimeout(async () => {
       try {
         await fetch(`${API_BASE}/counts/save-item`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             date: selectedDate,
+            location: loc,
             ...updatedItem
           })
         });
@@ -183,15 +282,16 @@ export default function App() {
         setSaveStatus('idle');
       }
     }, 350);
-  }, [countsHistory, selectedDate, users, currentUserId, products]);
+  }, [countsHistory, selectedDate, currentLocation, users, currentUserId, products]);
 
-  // Toggle Check status for an item
+  // Toggle Check
   const handleToggleCheck = useCallback(async (productId, newCheckState) => {
+    const loc = currentLocation;
     const currentUser = users.find(u => u.id === currentUserId) || users[0];
-    
-    // Update local immediately
+
     setCountsHistory(prev => {
-      const session = prev[selectedDate] || { date: selectedDate, items: {} };
+      const locSessions = prev[loc] || {};
+      const session = locSessions[selectedDate] || { date: selectedDate, items: {} };
       const item = session.items[productId] || {};
       const updated = {
         ...item,
@@ -202,11 +302,14 @@ export default function App() {
 
       return {
         ...prev,
-        [selectedDate]: {
-          ...session,
-          items: {
-            ...session.items,
-            [productId]: updated
+        [loc]: {
+          ...locSessions,
+          [selectedDate]: {
+            ...session,
+            items: {
+              ...session.items,
+              [productId]: updated
+            }
           }
         }
       };
@@ -219,6 +322,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: selectedDate,
+          location: loc,
           productId,
           checked: newCheckState,
           countedBy: currentUser ? currentUser.name : undefined
@@ -230,15 +334,17 @@ export default function App() {
       console.error('Erro ao alternar check:', err);
       setSaveStatus('idle');
     }
-  }, [selectedDate, users, currentUserId]);
+  }, [selectedDate, currentLocation, users, currentUserId]);
 
-  // Batch check multiple items
+  // Batch Check
   const handleBatchCheck = useCallback(async (productIds, checkState) => {
+    const loc = currentLocation;
     const currentUser = users.find(u => u.id === currentUserId) || users[0];
     const now = new Date().toISOString();
 
     setCountsHistory(prev => {
-      const session = prev[selectedDate] || { date: selectedDate, items: {} };
+      const locSessions = prev[loc] || {};
+      const session = locSessions[selectedDate] || { date: selectedDate, items: {} };
       const updatedItems = { ...session.items };
 
       productIds.forEach(id => {
@@ -254,9 +360,12 @@ export default function App() {
 
       return {
         ...prev,
-        [selectedDate]: {
-          ...session,
-          items: updatedItems
+        [loc]: {
+          ...locSessions,
+          [selectedDate]: {
+            ...session,
+            items: updatedItems
+          }
         }
       };
     });
@@ -267,6 +376,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: selectedDate,
+          location: loc,
           productIds,
           checked: checkState,
           countedBy: currentUser ? currentUser.name : undefined
@@ -275,7 +385,7 @@ export default function App() {
     } catch (err) {
       console.error('Erro no batch check:', err);
     }
-  }, [selectedDate, users, currentUserId]);
+  }, [selectedDate, currentLocation, users, currentUserId]);
 
   // Products CRUD
   const handleSaveProduct = async (productData) => {
@@ -344,9 +454,9 @@ export default function App() {
     }
   };
 
-  // Header quick summary stats
+  // Stats calculation
   const summaryStats = useMemo(() => {
-    const session = countsHistory[selectedDate];
+    const session = countsHistory.loja?.[selectedDate];
     let checkedCount = 0;
     let totalOutputToday = 0;
 
@@ -362,7 +472,26 @@ export default function App() {
       checkedCount,
       totalOutputToday
     };
-  }, [countsHistory, selectedDate, products]);
+  }, [countsHistory.loja, selectedDate, products]);
+
+  const depositoStats = useMemo(() => {
+    const session = countsHistory.deposito?.[selectedDate];
+    let checkedCount = 0;
+    let totalOutputToday = 0;
+
+    if (session && session.items) {
+      Object.values(session.items).forEach(it => {
+        if (it.checked) checkedCount++;
+        totalOutputToday += Number(it.outputCount) || 0;
+      });
+    }
+
+    return {
+      totalItems: products.length,
+      checkedCount,
+      totalOutputToday
+    };
+  }, [countsHistory.deposito, selectedDate, products]);
 
   if (loading) {
     return (
@@ -376,7 +505,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    <div className="min-h-screen flex flex-col bg-slate-50 w-full">
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -390,12 +519,30 @@ export default function App() {
         onOpenUsers={() => setIsUsersModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
         summaryStats={summaryStats}
+        depositoStats={depositoStats}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Main container: Full Width utilizing all left and right margins */}
+      <main className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-4 md:px-6 py-4">
         {activeTab === 'count' ? (
           <DailyCountView
+            key={`loja-${selectedDate}`}
             selectedDate={selectedDate}
+            location="loja"
+            products={products}
+            categories={categories}
+            users={users}
+            currentUserId={currentUserId}
+            countData={currentCountData}
+            onUpdateItem={handleUpdateItem}
+            onToggleCheck={handleToggleCheck}
+            onBatchCheck={handleBatchCheck}
+          />
+        ) : activeTab === 'deposito' ? (
+          <DailyCountView
+            key={`deposito-${selectedDate}`}
+            selectedDate={selectedDate}
+            location="deposito"
             products={products}
             categories={categories}
             users={users}
@@ -409,7 +556,7 @@ export default function App() {
           <DashboardView
             products={products}
             categories={categories}
-            countsHistory={countsHistory}
+            countsHistory={countsHistory.loja || {}}
             selectedDate={selectedDate}
           />
         )}
