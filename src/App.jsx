@@ -233,16 +233,16 @@ export default function App() {
     };
 
     // Formulas requested by user:
-    // Estoque Final = (contagem inicial + entrada) - ultima contagem
+    // Estoque Final = Última Contagem
     const numCurrent = Number(updatedItem.currentStock) || 0;
     const numEntries = Number(updatedItem.entries) || 0;
     const numTarde = Number(updatedItem.outputCount) || 0;
     const hasCount = updatedItem.countedStock !== null && updatedItem.countedStock !== undefined && updatedItem.countedStock !== '';
     const numCounted = hasCount ? Number(updatedItem.countedStock) : 0;
-    const estoqueFinal = hasCount ? ((numCurrent + numEntries) - numCounted) : (numCurrent + numEntries);
+    const estoqueFinal = hasCount ? numCounted : numCurrent;
 
-    // Diferença = (ultima contagem - contagem da tarde - entrada)
-    updatedItem.difference = hasCount ? (numCounted - numTarde - numEntries) : 0;
+    // Diferença = (ultima contagem - contagem da tarde)
+    updatedItem.difference = hasCount ? (numCounted - numTarde) : 0;
 
     // Update UI state immediately
     setCountsHistory(prev => {

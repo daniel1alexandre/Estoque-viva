@@ -291,10 +291,10 @@ app.post('/api/counts/save-item', (req, res) => {
   const numCounted = hasCount ? Number(countedStock) : null;
 
   // Formulas requested by user:
-  // Estoque Final = (contagem inicial + entrada) - ultima contagem
-  const estoqueFinal = hasCount ? ((numCurrent + numEntries) - numCounted) : (numCurrent + numEntries);
-  // Diferença = (ultima contagem - contagem da tarde - entrada)
-  const difference = hasCount ? (numCounted - numOutput - numEntries) : 0;
+  // Estoque Final = Última Contagem
+  const estoqueFinal = hasCount ? numCounted : numCurrent;
+  // Diferença = (ultima contagem - contagem da tarde)
+  const difference = hasCount ? (numCounted - numOutput) : 0;
 
   const prevItem = db.counts[loc][date].items[productId] || {};
   const isChecked = checked !== undefined ? checked : prevItem.checked || false;

@@ -437,13 +437,11 @@ export default function DailyCountView({
                   const countedStock = hasCount ? Number(item.countedStock) : 0;
                   const isChecked = !!item.checked;
 
-                  // FORMULA 1: Estoque Final = (contagem inicial + entrada) - ultima contagem
-                  const estoqueFinal = hasCount 
-                    ? ((currentStock + entries) - countedStock)
-                    : (currentStock + entries);
+                  // FORMULA: Estoque Final = Última Contagem
+                  const estoqueFinal = hasCount ? countedStock : '-';
 
-                  // FORMULA 2: Diferença = (ultima contagem - contagem da tarde - entrada)
-                  const diff = hasCount ? (countedStock - tardeCount - entries) : 0;
+                  // FORMULA: Diferença = Última Contagem - Contagem da Tarde
+                  const diff = hasCount ? (countedStock - tardeCount) : 0;
 
                   const hasTarde = item.outputCount !== 0 && item.outputCount !== null && item.outputCount !== undefined && item.outputCount !== '';
 
@@ -684,7 +682,7 @@ export default function DailyCountView({
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-blue-500" />
             <span>
-              <strong>Fórmulas:</strong> Estoque Final = (Inicial + Entrada) - Última Contagem | Diferença = Última Contagem - Contagem da Tarde - Entrada.
+              <strong>Fórmulas:</strong> Estoque Final = Última Contagem | Diferença = Última Contagem - Contagem da Tarde.
             </span>
           </div>
           <div className="flex items-center gap-4 font-semibold text-slate-700">

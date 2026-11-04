@@ -40,11 +40,13 @@ export function exportCountToCSV(date, products, countItems, users) {
     const currentStock = Number(item.currentStock ?? prod.currentStock) || 0;
     const entries = Number(item.entries) || 0;
     const tardeCount = Number(item.outputCount) || 0;
+    const hasCount = item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '';
+    const countedStock = hasCount ? Number(item.countedStock) : '';
     // Formulas requested:
-    // Estoque Final = (contagem inicial + entrada) - ultima contagem
-    const estoqueFinal = hasCount ? ((currentStock + entries) - Number(countedStock)) : (currentStock + entries);
-    // Diferença = (ultima contagem - contagem da tarde - entrada)
-    const diff = hasCount ? (Number(countedStock) - tardeCount - entries) : 0;
+    // Estoque Final = Última Contagem
+    const estoqueFinal = hasCount ? countedStock : currentStock;
+    // Diferença = (ultima contagem - contagem da tarde)
+    const diff = hasCount ? (Number(countedStock) - tardeCount) : 0;
     const checked = item.checked ? 'Conferido' : 'Pendente';
     const countedBy = item.countedBy || '';
     const checkedAt = item.checkedAt ? new Date(item.checkedAt).toLocaleTimeString('pt-BR') : '';
