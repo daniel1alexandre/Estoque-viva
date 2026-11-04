@@ -1,4 +1,4 @@
-# 📦 Estoque Diário Pro - Sistema de Controle e Contagens Diárias
+# 🏖️ Controle de Estoque Viva Beach - Arena Viva
 
 Sistema completo para controle de estoque diário, contagens físicas com conferência por check, acompanhamento de entradas, saídas, cálculo automático de divergências e dashboard analítico de saídas dos produtos.
 

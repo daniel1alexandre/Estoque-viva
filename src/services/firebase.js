@@ -1,0 +1,301 @@
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  collection, 
+  getDocs, 
+  deleteDoc, 
+  writeBatch 
+} from 'firebase/firestore';
+
+const STORAGE_KEY = 'viva_firebase_config';
+
+// Retrieve config from Vite Env variables or localStorage
+export function getFirebaseConfig() {
+  const localSaved = localStorage.getItem(STORAGE_KEY);
+  if (localSaved) {
+    try {
+      const parsed = JSON.parse(localSaved);
+      if (parsed.projectId && parsed.apiKey) {
+        return parsed;
+      }
+    } catch (e) {
+      console.warn('Erro ao ler config do Firebase do localStorage:', e);
+    }
+  }
+
+  // Fallback to Vite environment variables
+  return {
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || ''
+  };
+}
+
+export function saveFirebaseConfig(config) {
+  if (!config) {
+    localStorage.removeItem(STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+}
+
+let appInstance = null;
+let dbInstance = null;
+
+export function initFirebase() {
+  const config = getFirebaseConfig();
+  if (!config.apiKey || !config.projectId) {
+    return null;
+  }
+
+  try {
+    if (getApps().length > 0) {
+      appInstance = getApp();
+    } else {
+      appInstance = initializeApp(config);
+    }
+    dbInstance = getFirestore(appInstance);
+    return dbInstance;
+  } catch (err) {
+    console.error('Erro ao inicializar Firebase:', err);
+    return null;
+  }
+}
+
+export function isFirebaseConfigured() {
+  const config = getFirebaseConfig();
+  return !!(config.apiKey && config.projectId);
+}
+
+export function getDb() {
+  if (!dbInstance) {
+    return initFirebase();
+  }
+  return dbInstance;
+}
+
+// ----------------- FIRESTORE DATA METHODS -----------------
+
+// Load complete app data from Firestore
+export async function loadDataFromFirestore() {
+  const db = getDb();
+  if (!db) return null;
+
+  try {
+    // 1. Meta (Categories)
+    const metaRef = doc(db, 'settings', 'metadata');
+    const metaSnap = await getDoc(metaRef);
+    let categories = [];
+    if (metaSnap.exists()) {
+      categories = metaSnap.data().categories || [];
+    }
+
+    // 2. Users
+    const usersCol = collection(db, 'users');
+    const usersSnap = await getDocs(usersCol);
+    let users = [];
+    usersSnap.forEach(d => {
+      users.push({ id: d.id, ...d.data() });
+    });
+
+    // 3. Products
+    const prodsCol = collection(db, 'products');
+    const prodsSnap = await getDocs(prodsCol);
+    let products = [];
+    prodsSnap.forEach(d => {
+      products.push({ id: d.id, ...d.data() });
+    });
+
+    // 4. Counts (Daily sessions: documents with id `loja_{date}` or `deposito_{date}`)
+    const countsCol = collection(db, 'counts');
+    const countsSnap = await getDocs(countsCol);
+    const counts = { loja: {}, deposito: {} };
+    countsSnap.forEach(d => {
+      const data = d.data();
+      const loc = data.location || (d.id.startsWith('deposito') ? 'deposito' : 'loja');
+      const date = data.date || d.id.replace(`${loc}_`, '');
+      if (!counts[loc]) counts[loc] = {};
+      counts[loc][date] = {
+        date,
+        items: data.items || {}
+      };
+    });
+
+    return {
+      products,
+      categories,
+      users,
+      counts
+    };
+  } catch (err) {
+    console.error('Erro ao carregar dados do Firestore:', err);
+    throw err;
+  }
+}
+
+// Save single count item to Firestore
+export async function saveCountItemToFirestore(location, date, productId, itemData) {
+  const db = getDb();
+  if (!db) return;
+
+  try {
+    const docId = `${location}_${date}`;
+    const docRef = doc(db, 'counts', docId);
+    const snap = await getDoc(docRef);
+
+    let currentItems = {};
+    if (snap.exists()) {
+      currentItems = snap.data().items || {};
+    }
+
+    currentItems[productId] = {
+      ...(currentItems[productId] || {}),
+      ...itemData,
+      productId,
+      lastModified: new Date().toISOString()
+    };
+
+    await setDoc(docRef, {
+      location,
+      date,
+      items: currentItems,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    console.error(`Erro ao salvar item ${productId} no Firestore:`, err);
+  }
+}
+
+// Batch check items in Firestore
+export async function batchCheckInFirestore(location, date, productIds, checkState, countedBy) {
+  const db = getDb();
+  if (!db) return;
+
+  try {
+    const docId = `${location}_${date}`;
+    const docRef = doc(db, 'counts', docId);
+    const snap = await getDoc(docRef);
+
+    let currentItems = {};
+    if (snap.exists()) {
+      currentItems = snap.data().items || {};
+    }
+
+    const now = new Date().toISOString();
+    productIds.forEach(id => {
+      if (currentItems[id]) {
+        currentItems[id] = {
+          ...currentItems[id],
+          checked: checkState,
+          checkedAt: checkState ? now : null,
+          countedBy: countedBy || currentItems[id].countedBy
+        };
+      }
+    });
+
+    await setDoc(docRef, {
+      location,
+      date,
+      items: currentItems,
+      updatedAt: now
+    }, { merge: true });
+  } catch (err) {
+    console.error('Erro ao realizar batch check no Firestore:', err);
+  }
+}
+
+// Product CRUD
+export async function saveProductToFirestore(product) {
+  const db = getDb();
+  if (!db) return;
+  const prodId = product.id || 'prod-' + Date.now();
+  const prodRef = doc(db, 'products', prodId);
+  await setDoc(prodRef, { ...product, id: prodId }, { merge: true });
+  return { ...product, id: prodId };
+}
+
+export async function deleteProductFromFirestore(productId) {
+  const db = getDb();
+  if (!db) return;
+  const prodRef = doc(db, 'products', productId);
+  await deleteDoc(prodRef);
+}
+
+// Categories
+export async function saveCategoriesToFirestore(categories) {
+  const db = getDb();
+  if (!db) return;
+  const metaRef = doc(db, 'settings', 'metadata');
+  await setDoc(metaRef, { categories, updatedAt: new Date().toISOString() }, { merge: true });
+}
+
+// Users
+export async function saveUserToFirestore(user) {
+  const db = getDb();
+  if (!db) return;
+  const userId = user.id || 'usr-' + Date.now();
+  const userRef = doc(db, 'users', userId);
+  await setDoc(userRef, { ...user, id: userId }, { merge: true });
+  return { ...user, id: userId };
+}
+
+export async function deleteUserFromFirestore(userId) {
+  const db = getDb();
+  if (!db) return;
+  const userRef = doc(db, 'users', userId);
+  await deleteDoc(userRef);
+}
+
+// Seed initial data to Firebase Cloud Firestore (1-click sync)
+export async function seedDataToFirestore(products, categories, users, counts) {
+  const db = getDb();
+  if (!db) throw new Error('Firebase não está inicializado.');
+
+  try {
+    const batch = writeBatch(db);
+
+    // Save categories metadata
+    const metaRef = doc(db, 'settings', 'metadata');
+    batch.set(metaRef, { categories, updatedAt: new Date().toISOString() });
+
+    // Save users
+    users.forEach(u => {
+      const uRef = doc(db, 'users', u.id);
+      batch.set(uRef, { id: u.id, name: u.name });
+    });
+
+    // Save products (in chunks if needed)
+    products.forEach(p => {
+      const pRef = doc(db, 'products', p.id);
+      batch.set(pRef, p);
+    });
+
+    await batch.commit();
+
+    // Save counts
+    for (const [location, sessions] of Object.entries(counts || {})) {
+      for (const [date, session] of Object.entries(sessions || {})) {
+        if (session && session.items) {
+          const cRef = doc(db, 'counts', `${location}_${date}`);
+          await setDoc(cRef, {
+            location,
+            date,
+            items: session.items,
+            updatedAt: new Date().toISOString()
+          });
+        }
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Erro ao popular dados no Firestore:', err);
+    throw err;
+  }
+}

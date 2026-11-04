@@ -9,9 +9,10 @@ import {
   CheckCircle2, 
   Loader2, 
   Clock, 
-  Warehouse,
-  Boxes,
-  Store
+  Warehouse, 
+  Boxes, 
+  Store,
+  Flame
 } from 'lucide-react';
 import { formatDateBR } from '../utils/formatters';
 
@@ -27,6 +28,8 @@ export default function Header({
   onOpenProducts,
   onOpenUsers,
   onOpenExport,
+  onOpenFirebase,
+  isFirebaseActive,
   summaryStats,
   depositoStats
 }) {
@@ -38,14 +41,14 @@ export default function Header({
         {/* Top bar */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between py-2.5 border-b border-slate-100 gap-3">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-tr from-blue-700 to-indigo-600 p-2 rounded-xl text-white shadow-md shadow-blue-500/20">
-              <Boxes className="w-5 h-5" />
+            <div className="h-11 w-auto flex items-center justify-center p-1 bg-white rounded-xl border border-slate-200 shadow-2xs shrink-0">
+              <img src="/logo.png" alt="Arena Viva" className="h-9 w-auto object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-slate-900 tracking-tight">Estoque Diário Pro</h1>
-                <span className="text-[11px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">
-                  v2.0
+                <h1 className="text-lg font-bold text-slate-900 tracking-tight">Controle de Estoque Viva Beach</h1>
+                <span className="text-[11px] font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
+                  Arena Viva
                 </span>
               </div>
               <p className="text-xs text-slate-500">
@@ -121,6 +124,20 @@ export default function Header({
             >
               <Download className="w-3.5 h-3.5 text-blue-600" />
               <span>Exportar</span>
+            </button>
+
+            {/* Firebase Database Status & Config Button */}
+            <button
+              onClick={onOpenFirebase}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition shadow-2xs cursor-pointer ${
+                isFirebaseActive
+                  ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+              title="Configurar e sincronizar com o banco de dados Firebase"
+            >
+              <Flame className={`w-3.5 h-3.5 ${isFirebaseActive ? 'text-amber-600 fill-amber-500' : 'text-amber-600'}`} />
+              <span>{isFirebaseActive ? 'Firebase Ativo' : 'Firebase'}</span>
             </button>
           </div>
         </div>

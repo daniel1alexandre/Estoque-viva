@@ -5,7 +5,20 @@ import DashboardView from './components/DashboardView';
 import ProductManagementModal from './components/ProductManagementModal';
 import UserManagementModal from './components/UserManagementModal';
 import ExportModal from './components/ExportModal';
+import FirebaseConfigModal from './components/FirebaseConfigModal';
 import { getTodayDateString } from './utils/formatters';
+import {
+  isFirebaseConfigured,
+  initFirebase,
+  loadDataFromFirestore,
+  saveCountItemToFirestore,
+  batchCheckInFirestore,
+  saveProductToFirestore,
+  deleteProductFromFirestore,
+  saveCategoriesToFirestore,
+  saveUserToFirestore,
+  deleteUserFromFirestore
+} from './services/firebase';
 
 const API_BASE = '/api';
 
@@ -25,15 +38,39 @@ export default function App() {
   const [isProductsModalOpen, setIsProductsModalOpen] = useState(false);
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
+  const [isFirebaseActive, setIsFirebaseActive] = useState(isFirebaseConfigured());
 
   const saveTimeoutsRef = useRef({});
 
   // Active location: 'loja' or 'deposito'
   const currentLocation = activeTab === 'deposito' ? 'deposito' : 'loja';
 
-  // Fetch full data on initial mount
-  useEffect(() => {
-    async function loadData() {
+  // Fetch full data on initial mount or reload
+  const loadData = useCallback(async () => {
+    let loadedFromFirebase = false;
+
+    if (isFirebaseConfigured()) {
+      try {
+        initFirebase();
+        const fbData = await loadDataFromFirestore();
+        if (fbData && fbData.products && fbData.products.length > 0) {
+          setProducts(fbData.products);
+          setCategories(fbData.categories || []);
+          setUsers(fbData.users || []);
+          setCountsHistory(fbData.counts || { loja: {}, deposito: {} });
+          if (fbData.users && fbData.users.length > 0) {
+            setCurrentUserId(fbData.users[0].id);
+          }
+          setIsFirebaseActive(true);
+          loadedFromFirebase = true;
+        }
+      } catch (fbErr) {
+        console.warn('Tentativa com Firestore falhou, usando backend local:', fbErr);
+      }
+    }
+
+    if (!loadedFromFirebase) {
       try {
         const res = await fetch(`${API_BASE}/data`);
         if (!res.ok) throw new Error('Falha ao conectar com servidor');
@@ -88,12 +125,16 @@ export default function App() {
             console.error('Erro ao ler cache local:', e);
           }
         }
-      } finally {
-        setLoading(false);
       }
     }
-    loadData();
+
+    setIsFirebaseActive(isFirebaseConfigured());
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Helper: Find previous day's counted stock for a product in a location
   const getPrevCountedStock = useCallback((location, targetDateStr, productId, defaultVal) => {
@@ -311,6 +352,10 @@ export default function App() {
           })
         });
 
+        if (isFirebaseConfigured()) {
+          saveCountItemToFirestore(loc, selectedDate, productId, updatedItem);
+        }
+
         setSaveStatus('saved');
         setTimeout(() => {
           setSaveStatus(prev => prev === 'saved' ? 'idle' : prev);
@@ -397,6 +442,15 @@ export default function App() {
           countedBy: currentUser ? currentUser.name : undefined
         })
       });
+
+      if (isFirebaseConfigured()) {
+        saveCountItemToFirestore(loc, selectedDate, productId, {
+          checked: newCheckState,
+          checkedAt: newCheckState ? now : null,
+          countedBy: currentUser ? currentUser.name : undefined
+        });
+      }
+
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 1500);
     } catch (err) {
@@ -451,6 +505,10 @@ export default function App() {
           countedBy: currentUser ? currentUser.name : undefined
         })
       });
+
+      if (isFirebaseConfigured()) {
+        batchCheckInFirestore(loc, selectedDate, productIds, checkState, currentUser ? currentUser.name : undefined);
+      }
     } catch (err) {
       console.error('Erro no batch check:', err);
     }
@@ -465,16 +523,20 @@ export default function App() {
         body: JSON.stringify(productData)
       });
       const data = await res.json();
-      if (data.product) {
-        setProducts(prev => {
-          const index = prev.findIndex(p => p.id === data.product.id);
-          if (index !== -1) {
-            const next = [...prev];
-            next[index] = data.product;
-            return next;
-          }
-          return [...prev, data.product];
-        });
+      const savedProd = data.product || productData;
+      
+      setProducts(prev => {
+        const index = prev.findIndex(p => p.id === savedProd.id);
+        if (index !== -1) {
+          const next = [...prev];
+          next[index] = savedProd;
+          return next;
+        }
+        return [...prev, savedProd];
+      });
+
+      if (isFirebaseConfigured()) {
+        saveProductToFirestore(savedProd);
       }
     } catch (err) {
       console.error('Erro ao salvar produto:', err);
@@ -485,6 +547,10 @@ export default function App() {
     try {
       await fetch(`${API_BASE}/products/${productId}`, { method: 'DELETE' });
       setProducts(prev => prev.filter(p => p.id !== productId));
+
+      if (isFirebaseConfigured()) {
+        deleteProductFromFirestore(productId);
+      }
     } catch (err) {
       console.error('Erro ao deletar produto:', err);
     }
@@ -498,8 +564,11 @@ export default function App() {
         body: JSON.stringify({ name: catName })
       });
       const data = await res.json();
-      if (data.categories) {
-        setCategories(data.categories);
+      const updatedCats = data.categories || [...categories, catName];
+      setCategories(updatedCats);
+
+      if (isFirebaseConfigured()) {
+        saveCategoriesToFirestore(updatedCats);
       }
     } catch (err) {
       console.error('Erro ao adicionar categoria:', err);
@@ -514,9 +583,12 @@ export default function App() {
         body: JSON.stringify(userData)
       });
       const data = await res.json();
-      if (data.user) {
-        setUsers(prev => [...prev, data.user]);
-        setCurrentUserId(data.user.id);
+      const savedUser = data.user || { id: 'usr-' + Date.now(), name: userData.name };
+      setUsers(prev => [...prev, savedUser]);
+      setCurrentUserId(savedUser.id);
+
+      if (isFirebaseConfigured()) {
+        saveUserToFirestore(savedUser);
       }
     } catch (err) {
       console.error('Erro ao adicionar usuário:', err);
@@ -529,6 +601,7 @@ export default function App() {
     } catch (err) {
       console.error('Erro ao excluir usuário no backend:', err);
     }
+
     setUsers(prev => {
       const remaining = prev.filter(u => u.id !== userId);
       if (currentUserId === userId && remaining.length > 0) {
@@ -536,6 +609,10 @@ export default function App() {
       }
       return remaining;
     });
+
+    if (isFirebaseConfigured()) {
+      deleteUserFromFirestore(userId);
+    }
   };
 
   // Stats calculation - Saída é a diferença entre as contagens
@@ -622,6 +699,8 @@ export default function App() {
         onOpenProducts={() => setIsProductsModalOpen(true)}
         onOpenUsers={() => setIsUsersModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
+        onOpenFirebase={() => setIsFirebaseModalOpen(true)}
+        isFirebaseActive={isFirebaseActive}
         summaryStats={summaryStats}
         depositoStats={depositoStats}
       />
@@ -694,6 +773,19 @@ export default function App() {
         products={products}
         countData={currentCountData}
         users={users}
+      />
+
+      <FirebaseConfigModal
+        isOpen={isFirebaseModalOpen}
+        onClose={() => {
+          setIsFirebaseModalOpen(false);
+          setIsFirebaseActive(isFirebaseConfigured());
+        }}
+        products={products}
+        categories={categories}
+        users={users}
+        countsHistory={countsHistory}
+        onReloadData={loadData}
       />
     </div>
   );

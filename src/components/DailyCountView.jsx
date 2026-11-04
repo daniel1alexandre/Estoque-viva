@@ -400,11 +400,13 @@ export default function DailyCountView({
                   Última Contagem
                 </th>
 
+                {/* 7. Estoque Final (fórmula: (Inicial + Entrada) - Última Contagem) */}
                 {/* 7. Estoque Final (fórmula: Última Contagem) */}
                 <th className="py-3 px-2 text-center w-32 font-bold text-slate-900 bg-slate-100/70 border-r border-slate-200">
                   Estoque Final
                 </th>
 
+                {/* 8. Diferença (fórmula: Última Contagem - Contagem da Tarde - Entrada) */}
                 {/* 8. Diferença (fórmula: Última Contagem - Contagem da Tarde) */}
                 <th className="py-3 px-2 text-center w-32">
                   Diferença
@@ -689,6 +691,7 @@ export default function DailyCountView({
           </div>
           <div className="flex items-center gap-4 font-semibold text-slate-700">
             <span>Total Entradas: <strong className="text-emerald-700 font-bold">+{stats.totalEntries}</strong></span>
+            <span>Total Contagem da Tarde: <strong className="text-amber-700 font-bold">{stats.totalTarde}</strong></span>
             <span>Total Saídas: <strong className="text-blue-700 font-bold">{stats.totalSaidas}</strong></span>
           </div>
         </div>
