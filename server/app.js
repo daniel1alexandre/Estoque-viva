@@ -425,18 +425,24 @@ app.post('/api/categories', (req, res) => {
 });
 
 app.post('/api/users', (req, res) => {
-  const { name, role } = req.body;
-  if (!name) {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Nome é obrigatório' });
   }
   const newUser = {
     id: 'usr-' + Date.now(),
-    name: name.trim(),
-    role: role || 'Conferente'
+    name: name.trim()
   };
   db.users.push(newUser);
   saveDatabase(db);
   res.status(201).json({ success: true, user: newUser });
+});
+
+app.delete('/api/users/:id', (req, res) => {
+  const { id } = req.params;
+  db.users = db.users.filter(u => u.id !== id);
+  saveDatabase(db);
+  res.json({ success: true, message: 'Usuário excluído com sucesso' });
 });
 
 app.post('/api/reset-demo', (req, res) => {

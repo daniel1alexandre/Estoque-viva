@@ -523,7 +523,22 @@ export default function App() {
     }
   };
 
-  // Stats calculation
+  const handleDeleteUser = async (userId) => {
+    try {
+      await fetch(`${API_BASE}/users/${userId}`, { method: 'DELETE' });
+    } catch (err) {
+      console.error('Erro ao excluir usuário no backend:', err);
+    }
+    setUsers(prev => {
+      const remaining = prev.filter(u => u.id !== userId);
+      if (currentUserId === userId && remaining.length > 0) {
+        setCurrentUserId(remaining[0].id);
+      }
+      return remaining;
+    });
+  };
+
+  // Stats calculation - Saída é a diferença entre as contagens
   const summaryStats = useMemo(() => {
     const session = countsHistory.loja?.[selectedDate];
     let checkedCount = 0;
@@ -532,7 +547,17 @@ export default function App() {
     if (session && session.items) {
       Object.values(session.items).forEach(it => {
         if (it.checked) checkedCount++;
-        totalOutputToday += Number(it.outputCount) || 0;
+        const hasCount = it.countedStock !== null && it.countedStock !== undefined && it.countedStock !== '';
+        const hasTarde = it.outputCount !== null && it.outputCount !== undefined && it.outputCount !== '' && Number(it.outputCount) > 0;
+        let saida = 0;
+        if (hasCount && hasTarde) {
+          saida = Math.abs(Number(it.outputCount) - Number(it.countedStock));
+        } else if (hasCount && !hasTarde) {
+          const inicial = (Number(it.currentStock) || 0) + (Number(it.entries) || 0);
+          const final = Number(it.countedStock) || 0;
+          saida = Math.max(0, inicial - final);
+        }
+        totalOutputToday += saida;
       });
     }
 
@@ -551,7 +576,17 @@ export default function App() {
     if (session && session.items) {
       Object.values(session.items).forEach(it => {
         if (it.checked) checkedCount++;
-        totalOutputToday += Number(it.outputCount) || 0;
+        const hasCount = it.countedStock !== null && it.countedStock !== undefined && it.countedStock !== '';
+        const hasTarde = it.outputCount !== null && it.outputCount !== undefined && it.outputCount !== '' && Number(it.outputCount) > 0;
+        let saida = 0;
+        if (hasCount && hasTarde) {
+          saida = Math.abs(Number(it.outputCount) - Number(it.countedStock));
+        } else if (hasCount && !hasTarde) {
+          const inicial = (Number(it.currentStock) || 0) + (Number(it.entries) || 0);
+          const final = Number(it.countedStock) || 0;
+          saida = Math.max(0, inicial - final);
+        }
+        totalOutputToday += saida;
       });
     }
 
@@ -649,6 +684,7 @@ export default function App() {
         onClose={() => setIsUsersModalOpen(false)}
         users={users}
         onAddUser={handleAddUser}
+        onDeleteUser={handleDeleteUser}
       />
 
       <ExportModal

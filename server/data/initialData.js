@@ -1,8 +1,8 @@
 export const initialUsers = [
-  { id: 'usr-1', name: 'Carlos Eduardo', role: 'Almoxarife Líder' },
-  { id: 'usr-2', name: 'Mariana Santos', role: 'Conferente' },
-  { id: 'usr-3', name: 'Lucas Oliveira', role: 'Supervisor de Estoque' },
-  { id: 'usr-4', name: 'Juliana Costa', role: 'Auxiliar de Logística' }
+  { id: 'usr-1', name: 'Carlos Eduardo' },
+  { id: 'usr-2', name: 'Mariana Santos' },
+  { id: 'usr-3', name: 'Lucas Oliveira' },
+  { id: 'usr-4', name: 'Juliana Costa' }
 ];
 
 export const initialCategories = [

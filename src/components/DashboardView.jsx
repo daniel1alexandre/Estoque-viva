@@ -85,7 +85,17 @@ export default function DashboardView({
           const prod = products.find(p => p.id === pId);
           if (prod) {
             if (selectedCategoryFilter === 'ALL' || prod.category === selectedCategoryFilter) {
-              const out = Number(item.outputCount) || 0;
+              const hasCount = item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '';
+              const hasTarde = item.outputCount !== null && item.outputCount !== undefined && item.outputCount !== '' && Number(item.outputCount) > 0;
+              let out = 0;
+              if (hasCount && hasTarde) {
+                out = Math.abs(Number(item.outputCount) - Number(item.countedStock));
+              } else if (hasCount && !hasTarde) {
+                const inicial = (Number(item.currentStock) || 0) + (Number(item.entries) || 0);
+                const final = Number(item.countedStock) || 0;
+                out = Math.max(0, inicial - final);
+              }
+
               const ent = Number(item.entries) || 0;
               dayOutputs += out;
               dayEntries += ent;

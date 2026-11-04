@@ -1335,23 +1335,19 @@
   "users": [
     {
       "id": "usr-1",
-      "name": "Carlos Eduardo",
-      "role": "Almoxarife Líder"
+      "name": "Carlos Eduardo"
     },
     {
       "id": "usr-2",
-      "name": "Mariana Santos",
-      "role": "Conferente"
+      "name": "Mariana Santos"
     },
     {
       "id": "usr-3",
-      "name": "Lucas Oliveira",
-      "role": "Supervisor de Estoque"
+      "name": "Lucas Oliveira"
     },
     {
       "id": "usr-4",
-      "name": "Juliana Costa",
-      "role": "Auxiliar de Logística"
+      "name": "Juliana Costa"
     }
   ],
   "counts": {

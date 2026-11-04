@@ -82,6 +82,7 @@ export default function DailyCountView({
     let divergenceCount = 0;
     let totalEntries = 0;
     let totalTarde = 0;
+    let totalSaidas = 0;
 
     products.forEach(p => {
       const it = items[p.id];
@@ -92,6 +93,19 @@ export default function DailyCountView({
         }
         totalEntries += Number(it.entries) || 0;
         totalTarde += Number(it.outputCount) || 0;
+
+        // Saída de produtos é calculada pela diferença entre as contagens
+        const hasCount = it.countedStock !== null && it.countedStock !== undefined && it.countedStock !== '';
+        const hasTarde = it.outputCount !== null && it.outputCount !== undefined && it.outputCount !== '' && Number(it.outputCount) > 0;
+        let saida = 0;
+        if (hasCount && hasTarde) {
+          saida = Math.abs(Number(it.outputCount) - Number(it.countedStock));
+        } else if (hasCount && !hasTarde) {
+          const inicial = (Number(it.currentStock) || 0) + (Number(it.entries) || 0);
+          const final = Number(it.countedStock) || 0;
+          saida = Math.max(0, inicial - final);
+        }
+        totalSaidas += saida;
       }
     });
 
@@ -103,6 +117,7 @@ export default function DailyCountView({
       divergenceCount,
       totalEntries,
       totalTarde,
+      totalSaidas,
       percentChecked
     };
   }, [products, items]);
@@ -674,7 +689,7 @@ export default function DailyCountView({
           </div>
           <div className="flex items-center gap-4 font-semibold text-slate-700">
             <span>Total Entradas: <strong className="text-emerald-700 font-bold">+{stats.totalEntries}</strong></span>
-            <span>Total Contagem da Tarde: <strong className="text-amber-700 font-bold">{stats.totalTarde}</strong></span>
+            <span>Total Saídas: <strong className="text-blue-700 font-bold">{stats.totalSaidas}</strong></span>
           </div>
         </div>
       </div>
