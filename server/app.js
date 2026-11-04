@@ -198,10 +198,14 @@ function loadDatabase() {
 let dbVersion = Date.now();
 const sseClients = new Set();
 
-function notifyClients() {
+function notifyClients(originClientId) {
   dbVersion = Date.now();
-  const payload = JSON.stringify({ version: dbVersion });
+  const payload = JSON.stringify({ version: dbVersion, origin: originClientId });
   sseClients.forEach(client => {
+    // Only notify other clients, avoid notifying the client that made the change
+    if (originClientId && client.id === originClientId) {
+      return;
+    }
     try {
       client.res.write(`data: ${payload}\n\n`);
     } catch (e) {
@@ -210,14 +214,14 @@ function notifyClients() {
   });
 }
 
-function saveDatabase(data) {
+function saveDatabase(data, originClientId) {
   try {
     const dir = path.dirname(DB_FILE);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
-    notifyClients();
+    notifyClients(originClientId);
   } catch (err) {
     console.error('Error writing db.json:', err);
   }
@@ -238,7 +242,8 @@ app.get('/api/sync-events', (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
 
-  const client = { id: Date.now(), res };
+  const clientId = req.query.clientId || req.headers['x-client-id'] || 'client_' + Date.now();
+  const client = { id: clientId, res };
   sseClients.add(client);
 
   res.write(`data: ${JSON.stringify({ version: dbVersion, initial: true })}\n\n`);
@@ -354,7 +359,8 @@ app.post('/api/counts/save-item', (req, res) => {
   // Chain rule: propagate Estoque Final to next day!
   propagateToNextDay(db.counts[loc], date, productId, numCounted, isChecked, estoqueFinal);
 
-  saveDatabase(db);
+  const clientId = req.headers['x-client-id'] || req.body.clientId;
+  saveDatabase(db, clientId);
   res.json({ success: true, item: updatedItem, date, location: loc });
 });
 
@@ -378,7 +384,8 @@ app.post('/api/counts/toggle-check', (req, res) => {
   const exp = (Number(item.currentStock) || 0) + (Number(item.entries) || 0) - (Number(item.outputCount) || 0);
   propagateToNextDay(db.counts[loc], date, productId, item.countedStock, item.checked, exp);
 
-  saveDatabase(db);
+  const clientId = req.headers['x-client-id'] || req.body.clientId;
+  saveDatabase(db, clientId);
   res.json({ success: true, item });
 });
 
@@ -402,12 +409,14 @@ app.post('/api/counts/batch-check', (req, res) => {
     }
   });
 
-  saveDatabase(db);
+  const clientId = req.headers['x-client-id'] || req.body.clientId;
+  saveDatabase(db, clientId);
   res.json({ success: true, count: productIds.length });
 });
 
 app.post('/api/products', (req, res) => {
   const { id, code, name, category, unit, minStock, currentStock } = req.body;
+  const clientId = req.headers['x-client-id'] || req.body.clientId;
   if (!name || !category) {
     return res.status(400).json({ error: 'Nome e categoria são obrigatórios' });
   }
@@ -424,7 +433,7 @@ app.post('/api/products', (req, res) => {
         minStock: Number(minStock) || 0,
         currentStock: Number(currentStock) || 0
       };
-      saveDatabase(db);
+      saveDatabase(db, clientId);
       return res.json({ success: true, product: db.products[index] });
     }
   }
@@ -440,29 +449,32 @@ app.post('/api/products', (req, res) => {
   };
 
   db.products.push(newProduct);
-  saveDatabase(db);
+  saveDatabase(db, clientId);
   res.status(201).json({ success: true, product: newProduct });
 });
 
 app.delete('/api/products/:id', (req, res) => {
   const { id } = req.params;
+  const clientId = req.headers['x-client-id'];
   db.products = db.products.filter(p => p.id !== id);
-  saveDatabase(db);
+  saveDatabase(db, clientId);
   res.json({ success: true, message: 'Produto excluído' });
 });
 
 app.post('/api/categories', (req, res) => {
   const { name } = req.body;
+  const clientId = req.headers['x-client-id'] || req.body.clientId;
   if (!name || db.categories.includes(name)) {
     return res.status(400).json({ error: 'Categoria inválida ou já existente' });
   }
   db.categories.push(name.trim());
-  saveDatabase(db);
+  saveDatabase(db, clientId);
   res.json({ success: true, categories: db.categories });
 });
 
 app.post('/api/users', (req, res) => {
   const { name } = req.body;
+  const clientId = req.headers['x-client-id'] || req.body.clientId;
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Nome é obrigatório' });
   }
@@ -471,14 +483,15 @@ app.post('/api/users', (req, res) => {
     name: name.trim()
   };
   db.users.push(newUser);
-  saveDatabase(db);
+  saveDatabase(db, clientId);
   res.status(201).json({ success: true, user: newUser });
 });
 
 app.delete('/api/users/:id', (req, res) => {
   const { id } = req.params;
+  const clientId = req.headers['x-client-id'];
   db.users = db.users.filter(u => u.id !== id);
-  saveDatabase(db);
+  saveDatabase(db, clientId);
   res.json({ success: true, message: 'Usuário excluído com sucesso' });
 });
 

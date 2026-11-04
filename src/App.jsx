@@ -23,6 +23,52 @@ import {
 
 const API_BASE = '/api';
 
+// Timestamp-based intelligent merge to prevent overwriting in-flight changes
+function mergeItem(localItem, remoteItem) {
+  if (!localItem) return remoteItem;
+  if (!remoteItem) return localItem;
+  const localTime = new Date(localItem.lastModified || 0).getTime();
+  const remoteTime = new Date(remoteItem.lastModified || 0).getTime();
+  return remoteTime > localTime ? remoteItem : localItem;
+}
+
+function mergeSessions(localSession, remoteSession) {
+  if (!localSession) return remoteSession;
+  if (!remoteSession) return localSession;
+
+  const mergedItems = { ...(localSession.items || {}) };
+
+  Object.entries(remoteSession.items || {}).forEach(([pId, remoteItem]) => {
+    mergedItems[pId] = mergeItem(mergedItems[pId], remoteItem);
+  });
+
+  return {
+    ...remoteSession,
+    ...localSession,
+    items: mergedItems
+  };
+}
+
+function mergeCountsHistory(localHistory, remoteHistory) {
+  if (!localHistory) return remoteHistory || { loja: {}, deposito: {} };
+  if (!remoteHistory) return localHistory || { loja: {}, deposito: {} };
+
+  const result = {
+    loja: { ...(localHistory.loja || {}) },
+    deposito: { ...(localHistory.deposito || {}) }
+  };
+
+  ['loja', 'deposito'].forEach(loc => {
+    const remoteLoc = remoteHistory[loc] || {};
+    Object.entries(remoteLoc).forEach(([date, remoteSess]) => {
+      const localSess = result[loc][date];
+      result[loc][date] = mergeSessions(localSess, remoteSess);
+    });
+  });
+
+  return result;
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('count'); // 'count' (loja) | 'deposito' | 'dashboard'
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
@@ -43,14 +89,31 @@ export default function App() {
   const [isFirebaseActive, setIsFirebaseActive] = useState(isFirebaseConfigured());
 
   const saveTimeoutsRef = useRef({});
+  const clientIdRef = useRef('client_' + Math.random().toString(36).substring(2) + '_' + Date.now());
 
   // Active location: 'loja' or 'deposito'
   const currentLocation = activeTab === 'deposito' ? 'deposito' : 'loja';
 
   // Fetch full data on initial mount or reload
   const loadData = useCallback(async () => {
+    // 1. Load from localStorage first so user changes never disappear
+    try {
+      const cachedCounts = localStorage.getItem('viva_counts_history');
+      const cachedProds = localStorage.getItem('viva_products');
+      const cachedCats = localStorage.getItem('viva_categories');
+      const cachedUsers = localStorage.getItem('viva_users');
+
+      if (cachedCounts) setCountsHistory(JSON.parse(cachedCounts));
+      if (cachedProds) setProducts(JSON.parse(cachedProds));
+      if (cachedCats) setCategories(JSON.parse(cachedCats));
+      if (cachedUsers) setUsers(JSON.parse(cachedUsers));
+    } catch (e) {
+      console.warn('Erro ao ler cache local inicial:', e);
+    }
+
     let loadedFromFirebase = false;
 
+    // 2. Load from Firebase Cloud Firestore if active
     if (isFirebaseConfigured()) {
       try {
         initFirebase();
@@ -59,7 +122,13 @@ export default function App() {
           setProducts(fbData.products);
           setCategories(fbData.categories || []);
           setUsers(fbData.users || []);
-          setCountsHistory(fbData.counts || { loja: {}, deposito: {} });
+          setCountsHistory(prev => {
+            const merged = mergeCountsHistory(prev, fbData.counts || {});
+            try {
+              localStorage.setItem('viva_counts_history', JSON.stringify(merged));
+            } catch (e) {}
+            return merged;
+          });
           if (fbData.users && fbData.users.length > 0) {
             setCurrentUserId(fbData.users[0].id);
           }
@@ -71,16 +140,16 @@ export default function App() {
       }
     }
 
+    // 3. Fallback to server API / local db
     if (!loadedFromFirebase) {
       try {
         const res = await fetch(`${API_BASE}/data`);
         if (!res.ok) throw new Error('Falha ao conectar com servidor');
         const data = await res.json();
-        setProducts(data.products || []);
-        setCategories(data.categories || []);
-        setUsers(data.users || []);
+        if (data.products && data.products.length > 0) setProducts(data.products);
+        if (data.categories && data.categories.length > 0) setCategories(data.categories);
+        if (data.users && data.users.length > 0) setUsers(data.users);
 
-        // Format counts safely
         let normalizedCounts = { loja: {}, deposito: {} };
         if (data.counts) {
           if (data.counts.loja || data.counts.deposito) {
@@ -92,40 +161,20 @@ export default function App() {
             normalizedCounts.loja = data.counts;
           }
         }
-        setCountsHistory(normalizedCounts);
+
+        setCountsHistory(prev => {
+          const merged = mergeCountsHistory(prev, normalizedCounts);
+          try {
+            localStorage.setItem('viva_counts_history', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
 
         if (data.users && data.users.length > 0) {
           setCurrentUserId(data.users[0].id);
         }
-        localStorage.setItem('estoque_backup_data', JSON.stringify(data));
       } catch (err) {
         console.warn('Backend indisponível, usando armazenamento local fallback:', err);
-        const cached = localStorage.getItem('estoque_backup_data');
-        if (cached) {
-          try {
-            const data = JSON.parse(cached);
-            setProducts(data.products || []);
-            setCategories(data.categories || []);
-            setUsers(data.users || []);
-            let normalizedCounts = { loja: {}, deposito: {} };
-            if (data.counts) {
-              if (data.counts.loja || data.counts.deposito) {
-                normalizedCounts = {
-                  loja: data.counts.loja || {},
-                  deposito: data.counts.deposito || {}
-                };
-              } else {
-                normalizedCounts.loja = data.counts;
-              }
-            }
-            setCountsHistory(normalizedCounts);
-            if (data.users && data.users.length > 0) {
-              setCurrentUserId(data.users[0].id);
-            }
-          } catch (e) {
-            console.error('Erro ao ler cache local:', e);
-          }
-        }
       }
     }
 
@@ -143,19 +192,25 @@ export default function App() {
     if (isFirebaseActive) {
       const unsubscribe = subscribeToRealtimeFirestore({
         onCounts: (liveCounts) => {
-          setCountsHistory(prev => ({
-            loja: { ...prev.loja, ...(liveCounts.loja || {}) },
-            deposito: { ...prev.deposito, ...(liveCounts.deposito || {}) }
-          }));
+          setCountsHistory(prev => {
+            const merged = mergeCountsHistory(prev, liveCounts);
+            try {
+              localStorage.setItem('viva_counts_history', JSON.stringify(merged));
+            } catch (e) {}
+            return merged;
+          });
         },
         onProducts: (liveProducts) => {
           setProducts(liveProducts);
+          try { localStorage.setItem('viva_products', JSON.stringify(liveProducts)); } catch (e) {}
         },
         onCategories: (liveCategories) => {
           setCategories(liveCategories);
+          try { localStorage.setItem('viva_categories', JSON.stringify(liveCategories)); } catch (e) {}
         },
         onUsers: (liveUsers) => {
           setUsers(liveUsers);
+          try { localStorage.setItem('viva_users', JSON.stringify(liveUsers)); } catch (e) {}
         }
       });
 
@@ -169,19 +224,26 @@ export default function App() {
     let pollInterval = null;
 
     try {
-      sseSource = new EventSource(`${API_BASE}/sync-events`);
+      sseSource = new EventSource(`${API_BASE}/sync-events?clientId=${clientIdRef.current}`);
       sseSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          // If this update was initiated by this client, ignore it to prevent overwriting
+          if (data.origin && data.origin === clientIdRef.current) {
+            return;
+          }
           if (!data.initial) {
-            // Outro aparelho fez atualização! Atualizar dados em segundo plano
             fetch(`${API_BASE}/data`)
               .then(res => res.json())
               .then(latest => {
                 if (latest.counts) {
-                  setCountsHistory({
-                    loja: latest.counts.loja || {},
-                    deposito: latest.counts.deposito || {}
+                  setCountsHistory(prev => {
+                    const merged = mergeCountsHistory(prev, {
+                      loja: latest.counts.loja || {},
+                      deposito: latest.counts.deposito || {}
+                    });
+                    try { localStorage.setItem('viva_counts_history', JSON.stringify(merged)); } catch (e) {}
+                    return merged;
                   });
                 }
                 if (latest.products) setProducts(latest.products);
@@ -190,9 +252,7 @@ export default function App() {
               })
               .catch(() => {});
           }
-        } catch (e) {
-          // ignore
-        }
+        } catch (e) {}
       };
 
       sseSource.onerror = () => {
@@ -207,9 +267,13 @@ export default function App() {
                   const dataRes = await fetch(`${API_BASE}/data`);
                   const latest = await dataRes.json();
                   if (latest.counts) {
-                    setCountsHistory({
-                      loja: latest.counts.loja || {},
-                      deposito: latest.counts.deposito || {}
+                    setCountsHistory(prev => {
+                      const merged = mergeCountsHistory(prev, {
+                        loja: latest.counts.loja || {},
+                        deposito: latest.counts.deposito || {}
+                      });
+                      try { localStorage.setItem('viva_counts_history', JSON.stringify(merged)); } catch (e) {}
+                      return merged;
                     });
                   }
                   if (latest.products) setProducts(latest.products);
@@ -218,10 +282,8 @@ export default function App() {
                 }
                 lastVer = version;
               }
-            } catch (err) {
-              // ignore
-            }
-          }, 2500);
+            } catch (err) {}
+          }, 4000);
         }
       };
     } catch (e) {
@@ -425,10 +487,16 @@ export default function App() {
         }
       }
 
-      return {
+      const nextHistory = {
         ...prev,
         [loc]: updatedLoc
       };
+
+      try {
+        localStorage.setItem('viva_counts_history', JSON.stringify(nextHistory));
+      } catch (e) {}
+
+      return nextHistory;
     });
 
     setSaveStatus('saving');
@@ -442,7 +510,10 @@ export default function App() {
       try {
         await fetch(`${API_BASE}/counts/save-item`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Client-Id': clientIdRef.current
+          },
           body: JSON.stringify({
             date: selectedDate,
             location: loc,
@@ -457,18 +528,23 @@ export default function App() {
         setSaveStatus('saved');
         setTimeout(() => {
           setSaveStatus(prev => prev === 'saved' ? 'idle' : prev);
-        }, 2000);
+        }, 1500);
       } catch (err) {
-        console.error('Erro ao salvar item no servidor:', err);
-        setSaveStatus('idle');
+        console.warn('Servidor offline ou lento, alteração preservada localmente:', err);
+        if (isFirebaseConfigured()) {
+          saveCountItemToFirestore(loc, selectedDate, productId, updatedItem);
+        }
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 1500);
       }
-    }, 350);
+    }, 250);
   }, [countsHistory, selectedDate, currentLocation, users, currentUserId, products]);
 
   // Toggle Check
   const handleToggleCheck = useCallback(async (productId, newCheckState) => {
     const loc = currentLocation;
     const currentUser = users.find(u => u.id === currentUserId) || users[0];
+    const now = new Date().toISOString();
 
     setCountsHistory(prev => {
       const locSessions = prev[loc] || {};
@@ -477,8 +553,9 @@ export default function App() {
       const updated = {
         ...item,
         checked: newCheckState,
-        checkedAt: newCheckState ? new Date().toISOString() : null,
-        countedBy: currentUser ? currentUser.name : item.countedBy
+        checkedAt: newCheckState ? now : null,
+        countedBy: currentUser ? currentUser.name : item.countedBy,
+        lastModified: now
       };
 
       const hasCount = item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '';
@@ -521,17 +598,26 @@ export default function App() {
         }
       }
 
-      return {
+      const nextHistory = {
         ...prev,
         [loc]: updatedLoc
       };
+
+      try {
+        localStorage.setItem('viva_counts_history', JSON.stringify(nextHistory));
+      } catch (e) {}
+
+      return nextHistory;
     });
 
     setSaveStatus('saving');
     try {
       await fetch(`${API_BASE}/counts/toggle-check`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Client-Id': clientIdRef.current
+        },
         body: JSON.stringify({
           date: selectedDate,
           location: loc,
@@ -545,15 +631,25 @@ export default function App() {
         saveCountItemToFirestore(loc, selectedDate, productId, {
           checked: newCheckState,
           checkedAt: newCheckState ? now : null,
-          countedBy: currentUser ? currentUser.name : undefined
+          countedBy: currentUser ? currentUser.name : undefined,
+          lastModified: now
         });
       }
 
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 1500);
     } catch (err) {
-      console.error('Erro ao alternar check:', err);
-      setSaveStatus('idle');
+      console.warn('Erro ao alternar check no servidor, salvo localmente:', err);
+      if (isFirebaseConfigured()) {
+        saveCountItemToFirestore(loc, selectedDate, productId, {
+          checked: newCheckState,
+          checkedAt: newCheckState ? now : null,
+          countedBy: currentUser ? currentUser.name : undefined,
+          lastModified: now
+        });
+      }
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 1500);
     }
   }, [selectedDate, currentLocation, users, currentUserId]);
 
@@ -574,12 +670,13 @@ export default function App() {
             ...updatedItems[id],
             checked: checkState,
             checkedAt: checkState ? now : null,
-            countedBy: currentUser ? currentUser.name : updatedItems[id].countedBy
+            countedBy: currentUser ? currentUser.name : updatedItems[id].countedBy,
+            lastModified: now
           };
         }
       });
 
-      return {
+      const nextHistory = {
         ...prev,
         [loc]: {
           ...locSessions,
@@ -589,12 +686,21 @@ export default function App() {
           }
         }
       };
+
+      try {
+        localStorage.setItem('viva_counts_history', JSON.stringify(nextHistory));
+      } catch (e) {}
+
+      return nextHistory;
     });
 
     try {
       await fetch(`${API_BASE}/counts/batch-check`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Client-Id': clientIdRef.current
+        },
         body: JSON.stringify({
           date: selectedDate,
           location: loc,
@@ -608,16 +714,30 @@ export default function App() {
         batchCheckInFirestore(loc, selectedDate, productIds, checkState, currentUser ? currentUser.name : undefined);
       }
     } catch (err) {
-      console.error('Erro no batch check:', err);
+      console.warn('Erro no batch check no servidor, salvo localmente:', err);
+      if (isFirebaseConfigured()) {
+        batchCheckInFirestore(loc, selectedDate, productIds, checkState, currentUser ? currentUser.name : undefined);
+      }
     }
   }, [selectedDate, currentLocation, users, currentUserId]);
 
   // Products CRUD
   const handleSaveProduct = async (productData) => {
+    setProducts(prev => {
+      const index = prev.findIndex(p => p.id === productData.id);
+      const next = index !== -1 ? [...prev] : [...prev, productData];
+      if (index !== -1) next[index] = productData;
+      try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
     try {
       const res = await fetch(`${API_BASE}/products`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Client-Id': clientIdRef.current
+        },
         body: JSON.stringify(productData)
       });
       const data = await res.json();
@@ -625,88 +745,139 @@ export default function App() {
       
       setProducts(prev => {
         const index = prev.findIndex(p => p.id === savedProd.id);
+        const next = [...prev];
         if (index !== -1) {
-          const next = [...prev];
           next[index] = savedProd;
-          return next;
+        } else {
+          next.push(savedProd);
         }
-        return [...prev, savedProd];
+        try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
+        return next;
       });
 
       if (isFirebaseConfigured()) {
         saveProductToFirestore(savedProd);
       }
     } catch (err) {
-      console.error('Erro ao salvar produto:', err);
+      console.error('Erro ao salvar produto no servidor, mantido localmente:', err);
+      if (isFirebaseConfigured()) {
+        saveProductToFirestore(productData);
+      }
     }
   };
 
   const handleDeleteProduct = async (productId) => {
+    setProducts(prev => {
+      const next = prev.filter(p => p.id !== productId);
+      try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
     try {
-      await fetch(`${API_BASE}/products/${productId}`, { method: 'DELETE' });
-      setProducts(prev => prev.filter(p => p.id !== productId));
+      await fetch(`${API_BASE}/products/${productId}`, { 
+        method: 'DELETE',
+        headers: { 'X-Client-Id': clientIdRef.current }
+      });
 
       if (isFirebaseConfigured()) {
         deleteProductFromFirestore(productId);
       }
     } catch (err) {
-      console.error('Erro ao deletar produto:', err);
+      console.error('Erro ao deletar produto no servidor:', err);
+      if (isFirebaseConfigured()) {
+        deleteProductFromFirestore(productId);
+      }
     }
   };
 
   const handleAddCategory = async (catName) => {
+    setCategories(prev => {
+      const next = [...prev, catName];
+      try { localStorage.setItem('viva_categories', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
     try {
       const res = await fetch(`${API_BASE}/categories`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Client-Id': clientIdRef.current
+        },
         body: JSON.stringify({ name: catName })
       });
       const data = await res.json();
       const updatedCats = data.categories || [...categories, catName];
       setCategories(updatedCats);
+      try { localStorage.setItem('viva_categories', JSON.stringify(updatedCats)); } catch (e) {}
 
       if (isFirebaseConfigured()) {
         saveCategoriesToFirestore(updatedCats);
       }
     } catch (err) {
-      console.error('Erro ao adicionar categoria:', err);
+      console.error('Erro ao adicionar categoria no servidor:', err);
+      if (isFirebaseConfigured()) {
+        saveCategoriesToFirestore([...categories, catName]);
+      }
     }
   };
 
   const handleAddUser = async (userData) => {
+    const tempUser = { id: 'usr-' + Date.now(), name: userData.name };
+    setUsers(prev => {
+      const next = [...prev, tempUser];
+      try { localStorage.setItem('viva_users', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+    setCurrentUserId(tempUser.id);
+
     try {
       const res = await fetch(`${API_BASE}/users`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Client-Id': clientIdRef.current
+        },
         body: JSON.stringify(userData)
       });
       const data = await res.json();
-      const savedUser = data.user || { id: 'usr-' + Date.now(), name: userData.name };
-      setUsers(prev => [...prev, savedUser]);
+      const savedUser = data.user || tempUser;
+      setUsers(prev => {
+        const next = prev.map(u => u.id === tempUser.id ? savedUser : u);
+        try { localStorage.setItem('viva_users', JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
       setCurrentUserId(savedUser.id);
 
       if (isFirebaseConfigured()) {
         saveUserToFirestore(savedUser);
       }
     } catch (err) {
-      console.error('Erro ao adicionar usuário:', err);
+      console.error('Erro ao adicionar usuário no servidor:', err);
+      if (isFirebaseConfigured()) {
+        saveUserToFirestore(tempUser);
+      }
     }
   };
 
   const handleDeleteUser = async (userId) => {
-    try {
-      await fetch(`${API_BASE}/users/${userId}`, { method: 'DELETE' });
-    } catch (err) {
-      console.error('Erro ao excluir usuário no backend:', err);
-    }
-
     setUsers(prev => {
       const remaining = prev.filter(u => u.id !== userId);
+      try { localStorage.setItem('viva_users', JSON.stringify(remaining)); } catch (e) {}
       if (currentUserId === userId && remaining.length > 0) {
         setCurrentUserId(remaining[0].id);
       }
       return remaining;
     });
+
+    try {
+      await fetch(`${API_BASE}/users/${userId}`, { 
+        method: 'DELETE',
+        headers: { 'X-Client-Id': clientIdRef.current }
+      });
+    } catch (err) {
+      console.error('Erro ao excluir usuário no backend:', err);
+    }
 
     if (isFirebaseConfigured()) {
       deleteUserFromFirestore(userId);

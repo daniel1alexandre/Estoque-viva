@@ -140,7 +140,7 @@ export async function loadDataFromFirestore() {
   }
 }
 
-// Save single count item to Firestore
+// Save single count item to Firestore (Atomic nested merge)
 export async function saveCountItemToFirestore(location, date, productId, itemData) {
   const db = getDb();
   if (!db) return;
@@ -148,32 +148,28 @@ export async function saveCountItemToFirestore(location, date, productId, itemDa
   try {
     const docId = `${location}_${date}`;
     const docRef = doc(db, 'counts', docId);
-    const snap = await getDoc(docRef);
 
-    let currentItems = {};
-    if (snap.exists()) {
-      currentItems = snap.data().items || {};
-    }
-
-    currentItems[productId] = {
-      ...(currentItems[productId] || {}),
+    const now = new Date().toISOString();
+    const itemToSave = {
       ...itemData,
       productId,
-      lastModified: new Date().toISOString()
+      lastModified: itemData.lastModified || now
     };
 
     await setDoc(docRef, {
       location,
       date,
-      items: currentItems,
-      updatedAt: new Date().toISOString()
+      items: {
+        [productId]: itemToSave
+      },
+      updatedAt: now
     }, { merge: true });
   } catch (err) {
     console.error(`Erro ao salvar item ${productId} no Firestore:`, err);
   }
 }
 
-// Batch check items in Firestore
+// Batch check items in Firestore (Atomic nested merge)
 export async function batchCheckInFirestore(location, date, productIds, checkState, countedBy) {
   const db = getDb();
   if (!db) return;
@@ -181,29 +177,22 @@ export async function batchCheckInFirestore(location, date, productIds, checkSta
   try {
     const docId = `${location}_${date}`;
     const docRef = doc(db, 'counts', docId);
-    const snap = await getDoc(docRef);
-
-    let currentItems = {};
-    if (snap.exists()) {
-      currentItems = snap.data().items || {};
-    }
-
     const now = new Date().toISOString();
+
+    const itemsPatch = {};
     productIds.forEach(id => {
-      if (currentItems[id]) {
-        currentItems[id] = {
-          ...currentItems[id],
-          checked: checkState,
-          checkedAt: checkState ? now : null,
-          countedBy: countedBy || currentItems[id].countedBy
-        };
-      }
+      itemsPatch[id] = {
+        checked: checkState,
+        checkedAt: checkState ? now : null,
+        countedBy: countedBy || undefined,
+        lastModified: now
+      };
     });
 
     await setDoc(docRef, {
       location,
       date,
-      items: currentItems,
+      items: itemsPatch,
       updatedAt: now
     }, { merge: true });
   } catch (err) {
