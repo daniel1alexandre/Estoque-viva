@@ -481,13 +481,6 @@ export default function DailyCountView({
                               >
                                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
-                              <input
-                                type="text"
-                                value={inlineUnit}
-                                onChange={(e) => setInlineUnit(e.target.value)}
-                                className="w-16 text-[11px] border border-blue-300 rounded px-1.5 py-1 bg-white text-center font-medium focus:outline-none"
-                                placeholder="Unidade"
-                              />
                               <button
                                 type="button"
                                 onClick={() => {
@@ -497,14 +490,14 @@ export default function DailyCountView({
                                       id: product.id,
                                       name: inlineName.trim(),
                                       category: inlineCategory,
-                                      unit: inlineUnit.trim() || 'UN',
+                                      unit: product.unit || 'UN',
                                       minStock: product.minStock,
                                       currentStock: product.currentStock
                                     });
                                   }
                                   setEditingInlineProdId(null);
                                 }}
-                                className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer text-xs font-bold shadow-xs transition"
+                                className="px-2.5 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer text-xs font-bold shadow-xs transition"
                               >
                                 Salvar
                               </button>
@@ -520,13 +513,8 @@ export default function DailyCountView({
                           </div>
                         ) : (
                           <div className="flex items-center justify-between group">
-                            <div>
-                              <div className="font-semibold text-slate-900 leading-snug">
-                                {product.name}
-                              </div>
-                              <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                                Un: {product.unit || 'UN'}
-                              </div>
+                            <div className="font-semibold text-slate-900 leading-snug">
+                              {product.name}
                             </div>
                             <button
                               type="button"
@@ -534,7 +522,6 @@ export default function DailyCountView({
                                 setEditingInlineProdId(product.id);
                                 setInlineName(product.name);
                                 setInlineCategory(product.category);
-                                setInlineUnit(product.unit || 'UN');
                               }}
                               className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer"
                               title="Editar este item exatamente aqui"

@@ -227,17 +227,6 @@ export default function ProductManagementModal({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Unidade</label>
-                  <input
-                    type="text"
-                    value={newUnit}
-                    onChange={(e) => setNewUnit(e.target.value)}
-                    placeholder="Ex: UN, GF 600ml, LATA"
-                    className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 bg-white"
-                  />
-                </div>
-
-                <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Estoque Inicial</label>
                   <input
                     type="number"
@@ -285,7 +274,6 @@ export default function ProductManagementModal({
                 <tr>
                   <th className="py-2.5 px-3">Nome do Produto</th>
                   <th className="py-2.5 px-3">Categoria</th>
-                  <th className="py-2.5 px-3 text-center">Unidade</th>
                   <th className="py-2.5 px-3 text-center">Estoque Atual</th>
                   <th className="py-2.5 px-3 text-center">Estoque Mínimo</th>
                   <th className="py-2.5 px-3 text-right">Ações</th>
@@ -322,16 +310,6 @@ export default function ProductManagementModal({
                               <option key={c} value={c}>{c}</option>
                             ))}
                           </select>
-                        </td>
-
-                        {/* Unidade input */}
-                        <td className="py-2 px-3 text-center">
-                          <input
-                            type="text"
-                            value={editUnit}
-                            onChange={(e) => setEditUnit(e.target.value)}
-                            className="w-24 mx-auto text-center text-xs border border-blue-400 rounded-md px-2 py-1.5 bg-white font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
                         </td>
 
                         {/* Estoque Atual input */}
@@ -381,7 +359,7 @@ export default function ProductManagementModal({
                     );
                   }
 
-                  // Normal row display (SKU code completely removed)
+                  // Normal row display (SKU code and Unidade completely removed)
                   return (
                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2.5 px-3 font-semibold text-slate-900">{p.name}</td>
@@ -390,7 +368,6 @@ export default function ProductManagementModal({
                           {p.category}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-center text-slate-600">{p.unit || 'UN'}</td>
                       <td className="py-2.5 px-3 text-center font-bold text-slate-800">{p.currentStock}</td>
                       <td className="py-2.5 px-3 text-center text-slate-500 font-medium">{p.minStock || 0}</td>
                       <td className="py-2.5 px-3 text-right">
