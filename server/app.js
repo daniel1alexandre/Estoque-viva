@@ -134,9 +134,9 @@ function getPreviousDayCountedStock(locationCounts, targetDateStr, productId, de
   return defaultStock;
 }
 
-// Propagate countedStock to next day if next day exists
-function propagateToNextDay(locationCounts, currentDateStr, productId, newCountedStock) {
-  if (!locationCounts || newCountedStock === null || newCountedStock === undefined) return;
+// Propagate Estoque Final to next day as initial stock
+function propagateToNextDay(locationCounts, currentDateStr, productId, newCountedStock, isChecked, calculatedStock) {
+  if (!locationCounts) return;
   const futureDates = Object.keys(locationCounts)
     .filter(d => d > currentDateStr)
     .sort((a, b) => a.localeCompare(b)); // Ascending order (closest next day first)
@@ -145,8 +145,12 @@ function propagateToNextDay(locationCounts, currentDateStr, productId, newCounte
     const nextDate = futureDates[0];
     const nextItem = locationCounts[nextDate]?.items?.[productId];
     if (nextItem) {
-      nextItem.currentStock = Number(newCountedStock);
-      // Recalculate difference for next day
+      // If checked and physically counted, count assumes Estoque Final and propagates to next day
+      const finalStock = (isChecked && newCountedStock !== null && newCountedStock !== undefined)
+        ? Number(newCountedStock)
+        : Number(calculatedStock);
+
+      nextItem.currentStock = finalStock;
       const expected = nextItem.currentStock + (Number(nextItem.entries) || 0) - (Number(nextItem.outputCount) || 0);
       if (nextItem.countedStock !== null && nextItem.countedStock !== undefined && nextItem.countedStock !== '') {
         nextItem.difference = Number(nextItem.countedStock) - expected;
@@ -308,10 +312,8 @@ app.post('/api/counts/save-item', (req, res) => {
 
   db.counts[loc][date].items[productId] = updatedItem;
 
-  // Chain rule: if countedStock is provided, propagate as initial stock of the next day!
-  if (hasCount) {
-    propagateToNextDay(db.counts[loc], date, productId, numCounted);
-  }
+  // Chain rule: propagate Estoque Final to next day!
+  propagateToNextDay(db.counts[loc], date, productId, numCounted, isChecked, expectedStock);
 
   saveDatabase(db);
   res.json({ success: true, item: updatedItem, date, location: loc });
@@ -332,6 +334,10 @@ app.post('/api/counts/toggle-check', (req, res) => {
     item.countedBy = countedBy;
   }
   item.lastModified = new Date().toISOString();
+
+  // Propagate to next day because check changes Estoque Final if divergence exists
+  const exp = (Number(item.currentStock) || 0) + (Number(item.entries) || 0) - (Number(item.outputCount) || 0);
+  propagateToNextDay(db.counts[loc], date, productId, item.countedStock, item.checked, exp);
 
   saveDatabase(db);
   res.json({ success: true, item });

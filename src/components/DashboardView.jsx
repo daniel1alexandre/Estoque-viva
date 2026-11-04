@@ -304,9 +304,6 @@ export default function DashboardView({
                 <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
                   {aggregatedData.topProduct.totalOutput} saídas
                 </span>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {aggregatedData.topProduct.code}
-                </span>
               </div>
             </div>
           ) : (

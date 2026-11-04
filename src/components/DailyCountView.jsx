@@ -12,7 +12,9 @@ import {
   Clock, 
   Info,
   Warehouse,
-  Store
+  Store,
+  SunMedium,
+  Sparkles
 } from 'lucide-react';
 
 export default function DailyCountView({
@@ -70,7 +72,7 @@ export default function DailyCountView({
     let checkedCount = 0;
     let divergenceCount = 0;
     let totalEntries = 0;
-    let totalOutputs = 0;
+    let totalTarde = 0;
 
     products.forEach(p => {
       const it = items[p.id];
@@ -80,7 +82,7 @@ export default function DailyCountView({
           divergenceCount++;
         }
         totalEntries += Number(it.entries) || 0;
-        totalOutputs += Number(it.outputCount) || 0;
+        totalTarde += Number(it.outputCount) || 0;
       }
     });
 
@@ -91,7 +93,7 @@ export default function DailyCountView({
       checkedCount,
       divergenceCount,
       totalEntries,
-      totalOutputs,
+      totalTarde,
       percentChecked
     };
   }, [products, items]);
@@ -121,15 +123,15 @@ export default function DailyCountView({
             </h2>
             <p className="text-xs opacity-80">
               {isDeposito 
-                ? 'Contagem dos produtos armazenados no depósito (armazenamento de apoio e caixas)' 
-                : 'Contagem diária dos produtos expostos e disponíveis na frente da loja'}
+                ? 'Contagem e conferência dos produtos armazenados no depósito' 
+                : 'Contagem diária com contagem da tarde, última contagem física e definição de estoque final'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 text-xs font-semibold">
           <span className="bg-white/80 px-2.5 py-1 rounded-md border border-black/5 shadow-xs">
-            {stats.checkedCount} de {stats.totalItems} itens conferidos ({stats.percentChecked}%)
+            {stats.checkedCount} de {stats.totalItems} itens conferidos ({stats.percentChecked}% concluído)
           </span>
         </div>
       </div>
@@ -146,7 +148,7 @@ export default function DailyCountView({
             <span className="text-xs text-slate-500">produtos</span>
           </div>
           <div className="mt-1.5 text-[11px] text-slate-500">
-            {categories.length} categorias cadastradas
+            {categories.length} categorias ativas
           </div>
         </div>
 
@@ -179,7 +181,7 @@ export default function DailyCountView({
             <span className="text-xs text-slate-500">itens</span>
           </div>
           <div className="mt-1.5 text-[11px] text-slate-500">
-            {stats.divergenceCount === 0 ? 'Estoque 100% alinhado' : 'Atenção aos itens com diferença'}
+            {stats.divergenceCount === 0 ? 'Estoque 100% alinhado' : 'Ao dar check, o valor contado assume o estoque final'}
           </div>
         </div>
 
@@ -199,15 +201,15 @@ export default function DailyCountView({
 
         <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between col-span-2 md:col-span-1">
           <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold">Saídas do Dia</span>
-            <TrendingDown className="w-4 h-4 text-blue-500" />
+            <span className="text-xs font-semibold">Contagem da Tarde</span>
+            <SunMedium className="w-4 h-4 text-blue-500" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-blue-600">-{stats.totalOutputs}</span>
+            <span className="text-2xl font-bold text-blue-600">{stats.totalTarde}</span>
             <span className="text-xs text-slate-500">unidades</span>
           </div>
           <div className="mt-1.5 text-[11px] text-blue-600 font-medium">
-            Consumo / baixas registradas
+            Contagem intermediária da tarde
           </div>
         </div>
       </div>
@@ -215,7 +217,7 @@ export default function DailyCountView({
       {/* Filter and Search toolbar */}
       <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-3">
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-          {/* Search bar without code mention */}
+          {/* Search bar */}
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -340,18 +342,29 @@ export default function DailyCountView({
         </div>
       </div>
 
-      {/* Main Count Table - Full Screen Width with Reordered Columns */}
+      {/* Main Count Table - Reordered Columns:
+          1. Categoria
+          2. Item / Produto
+          3. Estoque Inicial
+          4. Entradas (+)
+          5. Contagem da Tarde
+          6. Última Contagem
+          7. Estoque Final (após a última contagem!)
+          8. Diferença
+          9. Check
+          10. Conferente / Horário
+      */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden w-full">
         <div className="overflow-x-auto w-full">
           <table className="w-full text-left text-sm border-collapse min-w-[1100px]">
             <thead>
               <tr className="bg-slate-50/90 text-slate-700 font-semibold text-xs border-b border-slate-200">
-                {/* 1. Categoria (Before Item/Produto) */}
+                {/* 1. Categoria */}
                 <th className="py-3 px-3 text-left w-36">
                   Categoria
                 </th>
 
-                {/* 2. Item / Produto (Clean, no SKU code) */}
+                {/* 2. Item / Produto */}
                 <th className="py-3 px-3 min-w-[260px]">
                   Item / Produto
                 </th>
@@ -366,19 +379,19 @@ export default function DailyCountView({
                   Entradas (+)
                 </th>
 
-                {/* 5. Saídas (-) */}
-                <th className="py-3 px-2 text-center w-28 bg-blue-50/50 text-blue-950 border-r border-blue-100">
-                  Saídas (-)
+                {/* 5. Contagem da Tarde (Substitui Saída) */}
+                <th className="py-3 px-2 text-center w-32 bg-blue-50/50 text-blue-950 border-r border-blue-100">
+                  Contagem da Tarde
                 </th>
 
-                {/* 6. Estoque Geral (Renamed as requested in Image 2) */}
-                <th className="py-3 px-2 text-center w-28 font-bold text-slate-900 bg-slate-100/60">
-                  Estoque Geral
-                </th>
-
-                {/* 7. Última Contagem */}
+                {/* 6. Última Contagem */}
                 <th className="py-3 px-2 text-center w-36 bg-amber-50/60 text-amber-950 font-bold border-x border-amber-200">
                   Última Contagem
+                </th>
+
+                {/* 7. Estoque Final (Colocado APÓS a Última Contagem!) */}
+                <th className="py-3 px-2 text-center w-32 font-bold text-slate-900 bg-slate-100/70 border-r border-slate-200">
+                  Estoque Final
                 </th>
 
                 {/* 8. Diferença */}
@@ -386,7 +399,7 @@ export default function DailyCountView({
                   Diferença
                 </th>
 
-                {/* 9. Check (Beside Diferença!) */}
+                {/* 9. Check */}
                 <th className="py-3 px-2 text-center w-20 bg-slate-50/50 border-x border-slate-200">
                   Check
                 </th>
@@ -423,12 +436,21 @@ export default function DailyCountView({
 
                   const currentStock = Number(item.currentStock ?? product.currentStock) || 0;
                   const entries = Number(item.entries) || 0;
-                  const outputCount = Number(item.outputCount) || 0;
-                  const estoqueGeral = currentStock + entries - outputCount;
+                  const tardeCount = Number(item.outputCount) || 0;
+                  const estoqueCalculado = currentStock + entries - tardeCount;
                   const hasCount = item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '';
                   const countedStock = hasCount ? Number(item.countedStock) : '';
-                  const diff = hasCount ? (Number(countedStock) - estoqueGeral) : 0;
+                  const diff = hasCount ? (Number(countedStock) - estoqueCalculado) : 0;
                   const isChecked = !!item.checked;
+
+                  // RULE: "quando tiver divergencia na contagem e for dado o check este valor de contagem assume o estoque final"
+                  // If checked and has physical count: Estoque Final ASSUMES the countedStock!
+                  // If not checked or not counted: Estoque Final remains the calculated stock.
+                  const estoqueFinal = (isChecked && hasCount) ? Number(countedStock) : estoqueCalculado;
+                  const isAssumedByCount = isChecked && hasCount && diff !== 0;
+
+                  // Conferente: inherits selected conferente from image/header if not individually customized
+                  const conferenteNome = item.countedBy || currentUser.name;
 
                   return (
                     <tr
@@ -437,14 +459,14 @@ export default function DailyCountView({
                         isChecked ? 'bg-emerald-50/25' : ''
                       }`}
                     >
-                      {/* 1. Categoria (Before Product) */}
+                      {/* 1. Categoria */}
                       <td className="py-2.5 px-3">
                         <span className="inline-block text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md whitespace-nowrap">
                           {product.category}
                         </span>
                       </td>
 
-                      {/* 2. Item / Produto (Clean Name and Unit only - SKU code removed as in image 1) */}
+                      {/* 2. Item / Produto */}
                       <td className="py-2.5 px-3">
                         <div className="font-semibold text-slate-900 leading-snug">
                           {product.name}
@@ -454,7 +476,7 @@ export default function DailyCountView({
                         </div>
                       </td>
 
-                      {/* 3. Estoque Inicial (Chain rule: yesterday's counted stock) */}
+                      {/* 3. Estoque Inicial */}
                       <td className="py-2.5 px-2 text-center font-semibold text-slate-800">
                         {currentStock}
                       </td>
@@ -474,7 +496,7 @@ export default function DailyCountView({
                         />
                       </td>
 
-                      {/* 5. Saídas (-) */}
+                      {/* 5. Contagem da Tarde */}
                       <td className="py-2.5 px-2 text-center bg-blue-50/20 border-r border-blue-100/50">
                         <input
                           type="number"
@@ -485,18 +507,11 @@ export default function DailyCountView({
                             const val = e.target.value === '' ? 0 : Number(e.target.value);
                             onUpdateItem(product.id, { outputCount: val });
                           }}
-                          className="w-18 mx-auto text-center font-bold text-blue-800 bg-white border border-blue-200 rounded-md py-1 px-1 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-2xs text-sm"
+                          className="w-20 mx-auto text-center font-bold text-blue-800 bg-white border border-blue-200 rounded-md py-1 px-1 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-2xs text-sm"
                         />
                       </td>
 
-                      {/* 6. Estoque Geral (Renamed from Estoque Esperado) */}
-                      <td className="py-2.5 px-2 text-center font-bold text-slate-900 bg-slate-100/40">
-                        <span className="inline-block bg-slate-200/70 text-slate-900 px-2.5 py-1 rounded-md text-xs font-mono font-bold">
-                          {estoqueGeral}
-                        </span>
-                      </td>
-
-                      {/* 7. Última Contagem (Physical Count) */}
+                      {/* 6. Última Contagem */}
                       <td className="py-2.5 px-2 text-center bg-amber-50/30 border-x border-amber-200/60">
                         <input
                           type="number"
@@ -507,7 +522,7 @@ export default function DailyCountView({
                             const val = e.target.value === '' ? null : Number(e.target.value);
                             onUpdateItem(product.id, { 
                               countedStock: val,
-                              checked: val !== null ? true : item.checked
+                              countedBy: conferenteNome
                             });
                           }}
                           className={`w-24 mx-auto text-center font-bold text-base rounded-lg py-1.5 px-2 border focus:outline-none focus:ring-2 transition shadow-xs ${
@@ -516,6 +531,25 @@ export default function DailyCountView({
                               : 'bg-white border-slate-300 text-slate-500 hover:border-amber-400'
                           }`}
                         />
+                      </td>
+
+                      {/* 7. Estoque Final (APÓS A ÚLTIMA CONTAGEM!) */}
+                      <td className="py-2.5 px-2 text-center font-bold bg-slate-100/50 border-r border-slate-200">
+                        <div className="flex flex-col items-center justify-center">
+                          <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-mono font-bold ${
+                            isAssumedByCount 
+                              ? 'bg-emerald-100 text-emerald-900 ring-1 ring-emerald-300' 
+                              : 'bg-slate-200/70 text-slate-900'
+                          }`}>
+                            {estoqueFinal}
+                          </span>
+                          {isAssumedByCount && (
+                            <span className="text-[9px] text-emerald-700 font-semibold mt-0.5 flex items-center gap-0.5">
+                              <Sparkles className="w-2.5 h-2.5" />
+                              Assumido p/ Check
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* 8. Diferença */}
@@ -542,7 +576,7 @@ export default function DailyCountView({
                         )}
                       </td>
 
-                      {/* 9. Check Button (Placed right next to Diferença!) */}
+                      {/* 9. Check Button */}
                       <td className="py-2.5 px-2 text-center bg-slate-50/40 border-x border-slate-200/80">
                         <button
                           type="button"
@@ -552,7 +586,13 @@ export default function DailyCountView({
                               ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30 scale-105 hover:bg-emerald-700'
                               : 'bg-white border-2 border-slate-300 text-transparent hover:border-emerald-500 hover:text-emerald-500/50'
                           }`}
-                          title={isChecked ? 'Item Conferido! Clique para desmarcar' : 'Clique para marcar como Conferido'}
+                          title={
+                            isChecked 
+                              ? 'Item Conferido! Clique para desmarcar' 
+                              : diff !== 0 && hasCount 
+                                ? 'Clique para homologar o check: a contagem assumirá o Estoque Final' 
+                                : 'Clique para marcar como Conferido'
+                          }
                         >
                           <Check className="w-5 h-5 stroke-[2.5]" />
                         </button>
@@ -562,7 +602,7 @@ export default function DailyCountView({
                       <td className="py-2.5 px-4">
                         <div className="flex flex-col gap-1">
                           <select
-                            value={item.countedBy || currentUser.name}
+                            value={conferenteNome}
                             onChange={(e) => onUpdateItem(product.id, { countedBy: e.target.value })}
                             className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium cursor-pointer"
                           >
@@ -594,12 +634,12 @@ export default function DailyCountView({
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-blue-500" />
             <span>
-              <strong>Dica:</strong> A última contagem deste dia se tornará o estoque inicial do dia seguinte automaticamente.
+              <strong>Regra de Conferência:</strong> Ao marcar o <strong>Check</strong> em itens com divergência, o valor da contagem física é homologado e assume o <strong>Estoque Final</strong>, que será o estoque inicial do próximo dia.
             </span>
           </div>
           <div className="flex items-center gap-4 font-semibold text-slate-700">
             <span>Total Entradas: <strong className="text-emerald-700 font-bold">+{stats.totalEntries}</strong></span>
-            <span>Total Saídas: <strong className="text-blue-700 font-bold">-{stats.totalOutputs}</strong></span>
+            <span>Total Contagem da Tarde: <strong className="text-blue-700 font-bold">{stats.totalTarde}</strong></span>
           </div>
         </div>
       </div>

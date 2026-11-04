@@ -22,17 +22,16 @@ export function exportCountToCSV(date, products, countItems, users) {
   const headers = [
     'Data',
     'Categoria',
-    'Código',
     'Produto',
     'Unidade',
-    'Estoque Sistema',
-    'Entradas',
-    'Saídas',
-    'Estoque Esperado',
+    'Estoque Inicial',
+    'Entradas (+)',
+    'Contagem da Tarde',
     'Última Contagem',
+    'Estoque Final',
     'Diferença',
     'Status Conferência',
-    'Conferido Por',
+    'Conferente',
     'Horário Conferência'
   ];
 
@@ -40,25 +39,28 @@ export function exportCountToCSV(date, products, countItems, users) {
     const item = countItems[prod.id] || {};
     const currentStock = Number(item.currentStock ?? prod.currentStock) || 0;
     const entries = Number(item.entries) || 0;
-    const outputCount = Number(item.outputCount) || 0;
-    const expected = currentStock + entries - outputCount;
-    const countedStock = item.countedStock !== null && item.countedStock !== undefined ? item.countedStock : '';
+    const tardeCount = Number(item.outputCount) || 0;
+    const estoqueCalculado = currentStock + entries - tardeCount;
+    const hasCount = item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '';
+    const countedStock = hasCount ? Number(item.countedStock) : '';
     const diff = item.difference !== undefined ? item.difference : 0;
     const checked = item.checked ? 'Conferido' : 'Pendente';
+    
+    // When divergence exists and is checked, physical count assumes Estoque Final
+    const estoqueFinal = (item.checked && hasCount) ? countedStock : estoqueCalculado;
     const countedBy = item.countedBy || '';
     const checkedAt = item.checkedAt ? new Date(item.checkedAt).toLocaleTimeString('pt-BR') : '';
 
     return [
       date,
       `"${prod.category}"`,
-      `"${prod.code}"`,
       `"${prod.name}"`,
       `"${prod.unit}"`,
       currentStock,
       entries,
-      outputCount,
-      expected,
+      tardeCount,
       countedStock,
+      estoqueFinal,
       diff,
       checked,
       `"${countedBy}"`,

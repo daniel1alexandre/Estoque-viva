@@ -176,6 +176,40 @@ export default function App() {
     items: {}
   };
 
+  // When user is selected in the Header, sync across all items in current count
+  const handleUserChange = useCallback((newUserId) => {
+    setCurrentUserId(newUserId);
+    const newUser = users.find(u => u.id === newUserId);
+    if (!newUser) return;
+
+    setCountsHistory(prev => {
+      const loc = currentLocation;
+      const locSessions = prev[loc] || {};
+      const currentSess = locSessions[selectedDate];
+      if (!currentSess || !currentSess.items) return prev;
+
+      const updatedItems = {};
+      Object.entries(currentSess.items).forEach(([pId, it]) => {
+        updatedItems[pId] = {
+          ...it,
+          countedBy: newUser.name
+        };
+      });
+
+      return {
+        ...prev,
+        [loc]: {
+          ...locSessions,
+          [selectedDate]: {
+            ...currentSess,
+            defaultUserId: newUserId,
+            items: updatedItems
+          }
+        }
+      };
+    });
+  }, [users, currentLocation, selectedDate]);
+
   // Immediate local update + debounced auto-save to backend
   const handleUpdateItem = useCallback((productId, partialChanges) => {
     const loc = currentLocation;
@@ -300,18 +334,49 @@ export default function App() {
         countedBy: currentUser ? currentUser.name : item.countedBy
       };
 
-      return {
-        ...prev,
-        [loc]: {
-          ...locSessions,
-          [selectedDate]: {
-            ...session,
-            items: {
-              ...session.items,
-              [productId]: updated
-            }
+      const hasCount = item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '';
+      const finalVal = (newCheckState && hasCount)
+        ? Number(item.countedStock)
+        : ((Number(item.currentStock) || 0) + (Number(item.entries) || 0) - (Number(item.outputCount) || 0));
+
+      const updatedLoc = {
+        ...locSessions,
+        [selectedDate]: {
+          ...session,
+          items: {
+            ...session.items,
+            [productId]: updated
           }
         }
+      };
+
+      const futureDates = Object.keys(updatedLoc)
+        .filter(d => d > selectedDate)
+        .sort((a, b) => a.localeCompare(b));
+
+      if (futureDates.length > 0) {
+        const nextDate = futureDates[0];
+        const nextSess = updatedLoc[nextDate];
+        if (nextSess && nextSess.items && nextSess.items[productId]) {
+          const nextIt = { ...nextSess.items[productId] };
+          nextIt.currentStock = finalVal;
+          const nextExp = nextIt.currentStock + (Number(nextIt.entries) || 0) - (Number(nextIt.outputCount) || 0);
+          if (nextIt.countedStock !== null && nextIt.countedStock !== undefined && nextIt.countedStock !== '') {
+            nextIt.difference = Number(nextIt.countedStock) - nextExp;
+          }
+          updatedLoc[nextDate] = {
+            ...nextSess,
+            items: {
+              ...nextSess.items,
+              [productId]: nextIt
+            }
+          };
+        }
+      }
+
+      return {
+        ...prev,
+        [loc]: updatedLoc
       };
     });
 
@@ -513,7 +578,7 @@ export default function App() {
         setSelectedDate={setSelectedDate}
         users={users}
         currentUserId={currentUserId}
-        setCurrentUserId={setCurrentUserId}
+        setCurrentUserId={handleUserChange}
         saveStatus={saveStatus}
         onOpenProducts={() => setIsProductsModalOpen(true)}
         onOpenUsers={() => setIsUsersModalOpen(true)}
