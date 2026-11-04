@@ -232,13 +232,17 @@ export default function App() {
       lastModified: new Date().toISOString()
     };
 
-    // Recalculate difference: countedStock - (currentStock + entries - outputCount)
+    // Formulas requested by user:
+    // Estoque Final = (contagem inicial + entrada) - ultima contagem
     const numCurrent = Number(updatedItem.currentStock) || 0;
     const numEntries = Number(updatedItem.entries) || 0;
-    const numOutput = Number(updatedItem.outputCount) || 0;
+    const numTarde = Number(updatedItem.outputCount) || 0;
     const hasCount = updatedItem.countedStock !== null && updatedItem.countedStock !== undefined && updatedItem.countedStock !== '';
-    const estoqueGeral = numCurrent + numEntries - numOutput;
-    updatedItem.difference = hasCount ? (Number(updatedItem.countedStock) - estoqueGeral) : 0;
+    const numCounted = hasCount ? Number(updatedItem.countedStock) : 0;
+    const estoqueFinal = hasCount ? ((numCurrent + numEntries) - numCounted) : (numCurrent + numEntries);
+
+    // Diferença = (ultima contagem - contagem da tarde - entrada)
+    updatedItem.difference = hasCount ? (numCounted - numTarde - numEntries) : 0;
 
     // Update UI state immediately
     setCountsHistory(prev => {

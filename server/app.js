@@ -290,9 +290,11 @@ app.post('/api/counts/save-item', (req, res) => {
   const hasCount = countedStock !== null && countedStock !== undefined && countedStock !== '';
   const numCounted = hasCount ? Number(countedStock) : null;
 
-  // Estoque Geral = initial stock + entries - output
-  const expectedStock = numCurrent + numEntries - numOutput;
-  const difference = hasCount ? (numCounted - expectedStock) : 0;
+  // Formulas requested by user:
+  // Estoque Final = (contagem inicial + entrada) - ultima contagem
+  const estoqueFinal = hasCount ? ((numCurrent + numEntries) - numCounted) : (numCurrent + numEntries);
+  // Diferença = (ultima contagem - contagem da tarde - entrada)
+  const difference = hasCount ? (numCounted - numOutput - numEntries) : 0;
 
   const prevItem = db.counts[loc][date].items[productId] || {};
   const isChecked = checked !== undefined ? checked : prevItem.checked || false;
@@ -313,7 +315,7 @@ app.post('/api/counts/save-item', (req, res) => {
   db.counts[loc][date].items[productId] = updatedItem;
 
   // Chain rule: propagate Estoque Final to next day!
-  propagateToNextDay(db.counts[loc], date, productId, numCounted, isChecked, expectedStock);
+  propagateToNextDay(db.counts[loc], date, productId, numCounted, isChecked, estoqueFinal);
 
   saveDatabase(db);
   res.json({ success: true, item: updatedItem, date, location: loc });
