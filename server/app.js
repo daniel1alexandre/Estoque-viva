@@ -195,6 +195,21 @@ function loadDatabase() {
   return initialData;
 }
 
+let dbVersion = Date.now();
+const sseClients = new Set();
+
+function notifyClients() {
+  dbVersion = Date.now();
+  const payload = JSON.stringify({ version: dbVersion });
+  sseClients.forEach(client => {
+    try {
+      client.res.write(`data: ${payload}\n\n`);
+    } catch (e) {
+      sseClients.delete(client);
+    }
+  });
+}
+
 function saveDatabase(data) {
   try {
     const dir = path.dirname(DB_FILE);
@@ -202,6 +217,7 @@ function saveDatabase(data) {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+    notifyClients();
   } catch (err) {
     console.error('Error writing db.json:', err);
   }
@@ -210,6 +226,27 @@ function saveDatabase(data) {
 let db = loadDatabase();
 
 // ---------------- ROUTES ----------------
+
+app.get('/api/version', (req, res) => {
+  res.json({ version: dbVersion });
+});
+
+// Server-Sent Events (SSE) for instantaneous multi-device synchronization
+app.get('/api/sync-events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const client = { id: Date.now(), res };
+  sseClients.add(client);
+
+  res.write(`data: ${JSON.stringify({ version: dbVersion, initial: true })}\n\n`);
+
+  req.on('close', () => {
+    sseClients.delete(client);
+  });
+});
 
 app.get('/api/data', (req, res) => {
   res.json(db);

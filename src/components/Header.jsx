@@ -59,6 +59,12 @@ export default function Header({
 
           {/* Right Top Actions */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Multi-device Live Sync Indicator */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200" title="Sincronização simultânea ativa entre celulares, tablets e computadores">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+              <span className="hidden sm:inline">Sincronizado</span>
+            </div>
+
             {/* Auto-save visual indicator */}
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-50 border border-slate-200">
               {saveStatus === 'saving' ? (

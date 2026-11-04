@@ -7,7 +7,8 @@ import {
   collection, 
   getDocs, 
   deleteDoc, 
-  writeBatch 
+  writeBatch,
+  onSnapshot
 } from 'firebase/firestore';
 
 const STORAGE_KEY = 'viva_firebase_config';
@@ -299,3 +300,103 @@ export async function seedDataToFirestore(products, categories, users, counts) {
     throw err;
   }
 }
+
+// Real-time synchronization across devices via Firestore onSnapshot
+export function subscribeToRealtimeFirestore({ onCounts, onProducts, onCategories, onUsers }) {
+  const db = getDb();
+  if (!db) return () => {};
+
+  const unsubs = [];
+
+  // 1. Listen to counts collection for instant live updates across devices
+  if (onCounts) {
+    try {
+      const countsCol = collection(db, 'counts');
+      const unsubCounts = onSnapshot(countsCol, (snap) => {
+        const counts = { loja: {}, deposito: {} };
+        snap.forEach(d => {
+          const data = d.data();
+          const loc = data.location || (d.id.startsWith('deposito') ? 'deposito' : 'loja');
+          const date = data.date || d.id.replace(`${loc}_`, '');
+          if (!counts[loc]) counts[loc] = {};
+          counts[loc][date] = {
+            date,
+            items: data.items || {}
+          };
+        });
+        onCounts(counts);
+      }, (err) => {
+        console.warn('Aviso: listener de contagens Firestore:', err);
+      });
+      unsubs.push(unsubCounts);
+    } catch (e) {
+      console.warn('Erro ao registrar listener de contagens:', e);
+    }
+  }
+
+  // 2. Listen to products collection
+  if (onProducts) {
+    try {
+      const prodsCol = collection(db, 'products');
+      const unsubProds = onSnapshot(prodsCol, (snap) => {
+        const list = [];
+        snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+        if (list.length > 0) {
+          onProducts(list);
+        }
+      }, (err) => {
+        console.warn('Aviso: listener de produtos Firestore:', err);
+      });
+      unsubs.push(unsubProds);
+    } catch (e) {
+      console.warn('Erro ao registrar listener de produtos:', e);
+    }
+  }
+
+  // 3. Listen to users collection
+  if (onUsers) {
+    try {
+      const usersCol = collection(db, 'users');
+      const unsubUsers = onSnapshot(usersCol, (snap) => {
+        const list = [];
+        snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+        if (list.length > 0) {
+          onUsers(list);
+        }
+      }, (err) => {
+        console.warn('Aviso: listener de usuários Firestore:', err);
+      });
+      unsubs.push(unsubUsers);
+    } catch (e) {
+      console.warn('Erro ao registrar listener de usuários:', e);
+    }
+  }
+
+  // 4. Listen to categories metadata
+  if (onCategories) {
+    try {
+      const metaRef = doc(db, 'settings', 'metadata');
+      const unsubMeta = onSnapshot(metaRef, (snap) => {
+        if (snap.exists() && snap.data().categories) {
+          onCategories(snap.data().categories);
+        }
+      }, (err) => {
+        console.warn('Aviso: listener de categorias Firestore:', err);
+      });
+      unsubs.push(unsubMeta);
+    } catch (e) {
+      console.warn('Erro ao registrar listener de categorias:', e);
+    }
+  }
+
+  return () => {
+    unsubs.forEach(unsub => {
+      try {
+        unsub();
+      } catch (e) {
+        // ignore
+      }
+    });
+  };
+}
+

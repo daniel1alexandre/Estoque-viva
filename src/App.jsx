@@ -17,7 +17,8 @@ import {
   deleteProductFromFirestore,
   saveCategoriesToFirestore,
   saveUserToFirestore,
-  deleteUserFromFirestore
+  deleteUserFromFirestore,
+  subscribeToRealtimeFirestore
 } from './services/firebase';
 
 const API_BASE = '/api';
@@ -135,6 +136,103 @@ export default function App() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // ---------------- SINCRONIZAÇÃO SIMULTÂNEA MULTI-APARELHO (REAL-TIME) ----------------
+  useEffect(() => {
+    // 1. Modo Nuvem Firebase Firestore: WebSockets onSnapshot em tempo real
+    if (isFirebaseActive) {
+      const unsubscribe = subscribeToRealtimeFirestore({
+        onCounts: (liveCounts) => {
+          setCountsHistory(prev => ({
+            loja: { ...prev.loja, ...(liveCounts.loja || {}) },
+            deposito: { ...prev.deposito, ...(liveCounts.deposito || {}) }
+          }));
+        },
+        onProducts: (liveProducts) => {
+          setProducts(liveProducts);
+        },
+        onCategories: (liveCategories) => {
+          setCategories(liveCategories);
+        },
+        onUsers: (liveUsers) => {
+          setUsers(liveUsers);
+        }
+      });
+
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    }
+
+    // 2. Modo Servidor Local: SSE (Server-Sent Events) com fallback para polling
+    let sseSource = null;
+    let pollInterval = null;
+
+    try {
+      sseSource = new EventSource(`${API_BASE}/sync-events`);
+      sseSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (!data.initial) {
+            // Outro aparelho fez atualização! Atualizar dados em segundo plano
+            fetch(`${API_BASE}/data`)
+              .then(res => res.json())
+              .then(latest => {
+                if (latest.counts) {
+                  setCountsHistory({
+                    loja: latest.counts.loja || {},
+                    deposito: latest.counts.deposito || {}
+                  });
+                }
+                if (latest.products) setProducts(latest.products);
+                if (latest.categories) setCategories(latest.categories);
+                if (latest.users) setUsers(latest.users);
+              })
+              .catch(() => {});
+          }
+        } catch (e) {
+          // ignore
+        }
+      };
+
+      sseSource.onerror = () => {
+        if (!pollInterval) {
+          let lastVer = null;
+          pollInterval = setInterval(async () => {
+            try {
+              const res = await fetch(`${API_BASE}/version`);
+              if (res.ok) {
+                const { version } = await res.json();
+                if (lastVer && version !== lastVer) {
+                  const dataRes = await fetch(`${API_BASE}/data`);
+                  const latest = await dataRes.json();
+                  if (latest.counts) {
+                    setCountsHistory({
+                      loja: latest.counts.loja || {},
+                      deposito: latest.counts.deposito || {}
+                    });
+                  }
+                  if (latest.products) setProducts(latest.products);
+                  if (latest.categories) setCategories(latest.categories);
+                  if (latest.users) setUsers(latest.users);
+                }
+                lastVer = version;
+              }
+            } catch (err) {
+              // ignore
+            }
+          }, 2500);
+        }
+      };
+    } catch (e) {
+      console.warn('SSE indisponível:', e);
+    }
+
+    return () => {
+      if (sseSource) sseSource.close();
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [isFirebaseActive]);
 
   // Helper: Find previous day's counted stock for a product in a location
   const getPrevCountedStock = useCallback((location, targetDateStr, productId, defaultVal) => {
