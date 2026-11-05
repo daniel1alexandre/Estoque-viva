@@ -270,7 +270,7 @@ export async function deleteSupplierFromFirestore(supplierId) {
 }
 
 // Seed initial data to Firebase Cloud Firestore (1-click sync)
-export async function seedDataToFirestore(products, categories, users, counts) {
+export async function seedDataToFirestore(products, categories, users, counts, suppliers = []) {
   const db = getDb();
   if (!db) throw new Error('Firebase não está inicializado.');
 
@@ -286,6 +286,14 @@ export async function seedDataToFirestore(products, categories, users, counts) {
       const uRef = doc(db, 'users', u.id);
       batch.set(uRef, { id: u.id, name: u.name });
     });
+
+    // Save suppliers
+    if (suppliers && Array.isArray(suppliers) && suppliers.length > 0) {
+      suppliers.forEach(s => {
+        const sRef = doc(db, 'suppliers', s.id);
+        batch.set(sRef, s);
+      });
+    }
 
     // Save products (in chunks if needed)
     products.forEach(p => {

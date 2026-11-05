@@ -1385,6 +1385,7 @@ export default function App() {
         products={products}
         categories={categories}
         users={users}
+        suppliers={suppliers}
         countsHistory={countsHistory}
         onReloadData={loadData}
       />

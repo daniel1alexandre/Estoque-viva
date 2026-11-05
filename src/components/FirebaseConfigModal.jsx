@@ -25,6 +25,7 @@ export default function FirebaseConfigModal({
   products,
   categories,
   users,
+  suppliers = [],
   countsHistory,
   onReloadData
 }) {
@@ -134,9 +135,9 @@ export default function FirebaseConfigModal({
 
     try {
       setIsSyncing(true);
-      setStatusMessage({ type: 'info', text: 'Sincronizando 146 produtos, categorias e usuários para o Firestore...' });
-      await seedDataToFirestore(products, categories, users, countsHistory);
-      setStatusMessage({ type: 'success', text: 'Todos os produtos, usuários e contagens foram sincronizados com sucesso no Cloud Firestore!' });
+      setStatusMessage({ type: 'info', text: 'Sincronizando produtos, categorias, fornecedores e usuários para o Firestore...' });
+      await seedDataToFirestore(products, categories, users, countsHistory, suppliers);
+      setStatusMessage({ type: 'success', text: 'Todos os produtos, fornecedores, usuários e contagens foram sincronizados com sucesso no Cloud Firestore!' });
     } catch (err) {
       setStatusMessage({ type: 'error', text: 'Erro ao sincronizar dados: ' + (err.message || 'Verifique as regras do Firestore no Console.') });
     } finally {
