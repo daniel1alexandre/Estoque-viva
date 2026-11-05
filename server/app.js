@@ -391,26 +391,42 @@ app.post('/api/products', (req, res) => {
   res.status(201).json({ success: true, product: newProduct });
 });
 
-// Bulk assign supplier to products
+// Bulk assign or synchronize supplier to products
 app.post('/api/products/batch-supplier', (req, res) => {
-  const { productIds, category, supplierId, supplierName } = req.body;
+  const { productIds, category, supplierId, supplierName, syncForSupplier } = req.body;
   const clientId = req.headers['x-client-id'] || req.body.clientId;
 
   let count = 0;
-  db.products.forEach(p => {
-    let match = false;
-    if (productIds && Array.isArray(productIds) && productIds.includes(p.id)) {
-      match = true;
-    } else if (category && p.category === category) {
-      match = true;
-    }
 
-    if (match) {
-      p.supplierId = supplierId || null;
-      p.supplierName = supplierName || null;
-      count++;
-    }
-  });
+  if (syncForSupplier && supplierId) {
+    const targetSet = new Set(productIds || []);
+    db.products.forEach(p => {
+      if (targetSet.has(p.id)) {
+        p.supplierId = supplierId;
+        p.supplierName = supplierName || null;
+        count++;
+      } else if (p.supplierId === supplierId) {
+        // Was unchecked by user, unlink
+        p.supplierId = null;
+        p.supplierName = null;
+      }
+    });
+  } else {
+    db.products.forEach(p => {
+      let match = false;
+      if (productIds && Array.isArray(productIds) && productIds.includes(p.id)) {
+        match = true;
+      } else if (category && p.category === category) {
+        match = true;
+      }
+
+      if (match) {
+        p.supplierId = supplierId || null;
+        p.supplierName = supplierName || null;
+        count++;
+      }
+    });
+  }
 
   saveDatabase(db, clientId);
   res.json({ success: true, count, products: db.products });

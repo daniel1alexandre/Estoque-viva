@@ -28,7 +28,8 @@ export default function OrdersView({
   suppliers = [],
   counts = {},
   selectedDate,
-  onOpenSuppliersModal
+  onOpenSuppliersModal,
+  onSaveProduct
 }) {
   const [viewMode, setViewMode] = useState('supplier'); // 'supplier' | 'category' | 'list'
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,7 +62,7 @@ export default function OrdersView({
       const autoSuggestion = Math.max(1, targetStock - Math.max(0, totalDepositoStock));
       const orderQty = customQuantities[product.id] !== undefined ? customQuantities[product.id] : autoSuggestion;
 
-      // Determine supplier: product's supplierId -> supplier with same category -> unassigned
+      // Determine supplier: product's supplierId -> supplier with same category (ONLY if category has single supplier) -> unassigned
       let assignedSupplier = null;
       if (product.supplierId) {
         assignedSupplier = suppliers.find(s => s.id === product.supplierId) || null;
@@ -70,7 +71,10 @@ export default function OrdersView({
         assignedSupplier = suppliers.find(s => s.name === product.supplierName) || null;
       }
       if (!assignedSupplier && product.category) {
-        assignedSupplier = suppliers.find(s => s.category === product.category) || null;
+        const catSuppliers = suppliers.filter(s => s.category === product.category);
+        if (catSuppliers.length === 1) {
+          assignedSupplier = catSuppliers[0];
+        }
       }
 
       return {
@@ -93,6 +97,16 @@ export default function OrdersView({
       ...prev,
       [productId]: num
     }));
+  };
+
+  const handleProductSupplierChange = (product, newSupplierId) => {
+    if (!onSaveProduct) return;
+    const sup = suppliers.find(s => s.id === newSupplierId);
+    onSaveProduct({
+      ...product,
+      supplierId: newSupplierId || null,
+      supplierName: sup ? sup.name : null
+    });
   };
 
   // Toggle card expansion
@@ -511,6 +525,20 @@ export default function OrdersView({
                                       <span className="inline-block bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium text-[11px]">
                                         {p.category}
                                       </span>
+                                      {!sup && onSaveProduct && (
+                                        <div className="mt-1">
+                                          <select
+                                            value=""
+                                            onChange={(e) => handleProductSupplierChange(p, e.target.value)}
+                                            className="text-[11px] bg-orange-50 border border-orange-200 text-orange-900 rounded-md px-1.5 py-0.5 font-medium cursor-pointer"
+                                          >
+                                            <option value="">Atribuir fornecedor...</option>
+                                            {suppliers.map(s => (
+                                              <option key={s.id} value={s.id}>{s.name}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      )}
                                     </td>
                                     <td className="py-3 px-3 text-center">
                                       <span className={`inline-flex items-center px-2 py-0.5 rounded font-bold text-xs ${
@@ -637,10 +665,23 @@ export default function OrdersView({
                                       <div className="text-[11px] text-slate-400">{p.code}</div>
                                     </td>
                                     <td className="py-3 px-3">
-                                      <span className="inline-flex items-center text-slate-700 font-medium">
-                                        <Building2 className="w-3.5 h-3.5 text-slate-400 mr-1" />
-                                        {it.supplierName}
-                                      </span>
+                                      {onSaveProduct ? (
+                                        <select
+                                          value={p.supplierId || ''}
+                                          onChange={(e) => handleProductSupplierChange(p, e.target.value)}
+                                          className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 font-medium text-slate-800 focus:ring-1 focus:ring-orange-500 focus:outline-none cursor-pointer max-w-[170px]"
+                                        >
+                                          <option value="">Sem Fornecedor</option>
+                                          {suppliers.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        <span className="inline-flex items-center text-slate-700 font-medium">
+                                          <Building2 className="w-3.5 h-3.5 text-slate-400 mr-1" />
+                                          {it.supplierName}
+                                        </span>
+                                      )}
                                     </td>
                                     <td className="py-3 px-3 text-center">
                                       <span className={`inline-flex items-center px-2 py-0.5 rounded font-bold text-xs ${
@@ -716,9 +757,22 @@ export default function OrdersView({
                             </span>
                           </td>
                           <td className="py-3 px-3">
-                            <span className="text-slate-700 font-medium">
-                              {it.supplierName}
-                            </span>
+                            {onSaveProduct ? (
+                              <select
+                                value={p.supplierId || ''}
+                                onChange={(e) => handleProductSupplierChange(p, e.target.value)}
+                                className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 font-medium text-slate-800 focus:ring-1 focus:ring-orange-500 focus:outline-none cursor-pointer max-w-[170px]"
+                              >
+                                <option value="">Sem Fornecedor</option>
+                                {suppliers.map(s => (
+                                  <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="text-slate-700 font-medium">
+                                {it.supplierName}
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-3 text-center">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded font-bold text-xs ${
@@ -760,3 +814,4 @@ export default function OrdersView({
     </div>
   );
 }
+

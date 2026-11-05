@@ -1046,6 +1046,52 @@ export default function App() {
     }
   };
 
+  const handleAssignProductsToSupplier = async (supplierId, supplierName, productIds) => {
+    const targetSet = new Set(productIds || []);
+    let updatedProducts = [];
+
+    setProducts(prev => {
+      const next = prev.map(p => {
+        if (targetSet.has(p.id)) {
+          return { ...p, supplierId, supplierName };
+        } else if (p.supplierId === supplierId) {
+          // Unlinked
+          return { ...p, supplierId: null, supplierName: null };
+        }
+        return p;
+      });
+      updatedProducts = next;
+      try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
+    try {
+      await fetch(`${API_BASE}/products/batch-supplier`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Id': clientIdRef.current
+        },
+        body: JSON.stringify({
+          syncForSupplier: true,
+          supplierId,
+          supplierName,
+          productIds
+        })
+      });
+
+      if (isFirebaseConfigured()) {
+        updatedProducts.forEach(p => {
+          if (targetSet.has(p.id) || p.supplierId === supplierId) {
+            saveProductToFirestore(p);
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Erro ao vincular produtos ao fornecedor:', err);
+    }
+  };
+
   const handleBatchAssignSupplierCategory = async (category, supplierId, supplierName) => {
     setProducts(prev => {
       const next = prev.map(p => {
@@ -1240,6 +1286,7 @@ export default function App() {
             counts={countsHistory}
             selectedDate={selectedDate}
             onOpenSuppliersModal={() => setIsSuppliersModalOpen(true)}
+            onSaveProduct={handleSaveProduct}
           />
         ) : (
           <DashboardView
@@ -1282,6 +1329,7 @@ export default function App() {
         onSaveSupplier={handleSaveSupplier}
         onDeleteSupplier={handleDeleteSupplier}
         onBatchAssignCategory={handleBatchAssignSupplierCategory}
+        onAssignProductsToSupplier={handleAssignProductsToSupplier}
       />
 
       <ExportModal
