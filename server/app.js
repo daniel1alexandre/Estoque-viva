@@ -272,7 +272,13 @@ app.post('/api/counts/save-item', (req, res) => {
     : (hasCount ? (numCounted - numOutput) : 0);
 
   const prevItem = db.counts[loc][date].items[productId] || {};
-  const isChecked = checked !== undefined ? checked : prevItem.checked || false;
+  const hasOutput = outputCount !== null && outputCount !== undefined && outputCount !== '';
+  let isChecked = checked !== undefined ? checked : prevItem.checked || false;
+  
+  // Regra: quando a contagem da tarde e a última contagem forem feitas e forem iguais, o check vai automático
+  if (loc === 'loja' && hasOutput && hasCount && numOutput === numCounted) {
+    isChecked = true;
+  }
 
   const updatedItem = {
     productId,

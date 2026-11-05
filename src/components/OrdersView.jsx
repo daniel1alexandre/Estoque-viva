@@ -39,27 +39,47 @@ export default function OrdersView({
   const [customQuantities, setCustomQuantities] = useState({});
   const [expandedCards, setExpandedCards] = useState({});
 
-  // 1. Calculate Depósito Stock for each product
-  const depositoSession = counts?.deposito?.[selectedDate];
+  // Calculate Loja and Depósito Sessions for selected date
+  const lojaSession = counts?.loja?.[selectedDate]?.items || {};
+  const depositoSession = counts?.deposito?.[selectedDate]?.items || {};
 
   const orderItems = useMemo(() => {
     return products.map(product => {
-      const itemData = depositoSession?.items?.[product.id];
-      
-      // Depósito current stock: counted stock or base stock + entries
+      // 1. Depósito stock: base stock + entries
+      const depItem = depositoSession[product.id];
       let stock = product.currentStock || 0;
       let entries = 0;
-      if (itemData) {
-        stock = Number(itemData.currentStock ?? product.currentStock) || 0;
-        entries = Number(itemData.entries) || 0;
+      if (depItem) {
+        stock = Number(depItem.currentStock ?? product.currentStock) || 0;
+        entries = Number(depItem.entries) || 0;
       }
       const totalDepositoStock = stock + entries;
+
+      // 2. Loja stock
+      const lojaItem = lojaSession[product.id];
+      let lojaStock = product.currentStock || 0;
+      if (lojaItem) {
+        const hasCount = lojaItem.countedStock !== null && lojaItem.countedStock !== undefined && lojaItem.countedStock !== '';
+        if (hasCount) {
+          lojaStock = Number(lojaItem.countedStock);
+        } else {
+          const cur = Number(lojaItem.currentStock ?? product.currentStock) || 0;
+          const ent = Number(lojaItem.entries) || 0;
+          const diff = Math.abs(Number(lojaItem.difference) || 0);
+          lojaStock = Math.max(0, cur + ent - diff);
+        }
+      }
+
+      // 3. Estoque Geral Total
+      const totalGeneralStock = lojaStock + totalDepositoStock;
       const minStock = Number(product.minStock) || 0;
-      const needsOrder = totalDepositoStock <= minStock;
+
+      // Regra: Produtos cujo estoque geral ou estoque no depósito estiver igual ou abaixo do mínimo são lançados em Pedidos
+      const needsOrder = totalGeneralStock <= minStock || totalDepositoStock <= minStock;
       
-      // Suggested order qty: target = minStock * 2 (or at least minStock if stock < minStock)
+      // Suggested order qty: target = minStock * 2 (ou pelo menos repor o déficit)
       const targetStock = minStock > 0 ? minStock * 2 : 10;
-      const autoSuggestion = Math.max(1, targetStock - Math.max(0, totalDepositoStock));
+      const autoSuggestion = Math.max(1, targetStock - Math.max(0, totalGeneralStock));
       const orderQty = customQuantities[product.id] !== undefined ? customQuantities[product.id] : autoSuggestion;
 
       // Determine supplier: product's supplierId -> supplier with same category (ONLY if category has single supplier) -> unassigned
@@ -79,16 +99,18 @@ export default function OrdersView({
 
       return {
         product,
+        lojaStock,
         depositoStock: totalDepositoStock,
+        totalGeneralStock,
         minStock,
         needsOrder,
-        deficit: Math.max(0, minStock - totalDepositoStock),
+        deficit: Math.max(0, minStock - totalGeneralStock),
         orderQty,
         supplier: assignedSupplier,
         supplierName: assignedSupplier ? assignedSupplier.name : 'Sem Fornecedor Vinculado'
       };
-    }).filter(item => item.needsOrder); // Only items where depositoStock <= minStock
-  }, [products, depositoSession, suppliers, customQuantities]);
+    }).filter(item => item.needsOrder); // Only items where generalStock <= minStock OR depositoStock <= minStock
+  }, [products, lojaSession, depositoSession, suppliers, customQuantities]);
 
   // Handle suggested qty edit
   const handleQtyChange = (productId, val) => {
@@ -504,7 +526,7 @@ export default function OrdersView({
                               <tr className="bg-slate-50/80 text-slate-600 border-b border-slate-200">
                                 <th className="py-2.5 px-4 font-bold">Produto</th>
                                 <th className="py-2.5 px-3 font-bold">Segmento</th>
-                                <th className="py-2.5 px-3 font-bold text-center">Estoque Atual</th>
+                                <th className="py-2.5 px-3 font-bold text-center">Estoque Geral (Total)</th>
                                 <th className="py-2.5 px-3 font-bold text-center">Estoque Mínimo</th>
                                 <th className="py-2.5 px-3 font-bold text-center">Déficit</th>
                                 <th className="py-2.5 px-4 font-bold text-right">Qtd. a Pedir</th>
@@ -513,7 +535,7 @@ export default function OrdersView({
                             <tbody className="divide-y divide-slate-100">
                               {group.items.map(it => {
                                 const p = it.product;
-                                const isZero = it.depositoStock === 0;
+                                const isZero = it.totalGeneralStock === 0;
 
                                 return (
                                   <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
@@ -541,14 +563,23 @@ export default function OrdersView({
                                       )}
                                     </td>
                                     <td className="py-3 px-3 text-center">
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded font-bold text-xs ${
-                                        isZero ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'
-                                      }`}>
-                                        {it.depositoStock}
-                                      </span>
+                                      <div className="flex flex-col items-center">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded font-bold text-xs ${
+                                          isZero 
+                                            ? 'bg-rose-100 text-rose-700 border border-rose-300' 
+                                            : it.totalGeneralStock <= it.minStock 
+                                              ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                                              : 'bg-slate-100 text-slate-700'
+                                        }`}>
+                                          {it.totalGeneralStock} un
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
+                                          Loja: {it.lojaStock} • Dep: {it.depositoStock}
+                                        </span>
+                                      </div>
                                     </td>
                                     <td className="py-3 px-3 text-center text-slate-600 font-semibold">
-                                      {it.minStock}
+                                      {it.minStock} un
                                     </td>
                                     <td className="py-3 px-3 text-center">
                                       <span className="text-rose-600 font-bold">
@@ -647,7 +678,7 @@ export default function OrdersView({
                               <tr className="bg-slate-50/80 text-slate-600 border-b border-slate-200">
                                 <th className="py-2.5 px-4 font-bold">Produto</th>
                                 <th className="py-2.5 px-3 font-bold">Fornecedor</th>
-                                <th className="py-2.5 px-3 font-bold text-center">Estoque Atual</th>
+                                <th className="py-2.5 px-3 font-bold text-center">Estoque Geral (Total)</th>
                                 <th className="py-2.5 px-3 font-bold text-center">Estoque Mínimo</th>
                                 <th className="py-2.5 px-3 font-bold text-center">Déficit</th>
                                 <th className="py-2.5 px-4 font-bold text-right">Qtd. a Pedir</th>
@@ -656,7 +687,7 @@ export default function OrdersView({
                             <tbody className="divide-y divide-slate-100">
                               {group.items.map(it => {
                                 const p = it.product;
-                                const isZero = it.depositoStock === 0;
+                                const isZero = it.totalGeneralStock === 0;
 
                                 return (
                                   <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
@@ -684,14 +715,23 @@ export default function OrdersView({
                                       )}
                                     </td>
                                     <td className="py-3 px-3 text-center">
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded font-bold text-xs ${
-                                        isZero ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'
-                                      }`}>
-                                        {it.depositoStock}
-                                      </span>
+                                      <div className="flex flex-col items-center">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded font-bold text-xs ${
+                                          isZero 
+                                            ? 'bg-rose-100 text-rose-700 border border-rose-300' 
+                                            : it.totalGeneralStock <= it.minStock 
+                                              ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                                              : 'bg-slate-100 text-slate-700'
+                                        }`}>
+                                          {it.totalGeneralStock} un
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
+                                          Loja: {it.lojaStock} • Dep: {it.depositoStock}
+                                        </span>
+                                      </div>
                                     </td>
                                     <td className="py-3 px-3 text-center text-slate-600 font-semibold">
-                                      {it.minStock}
+                                      {it.minStock} un
                                     </td>
                                     <td className="py-3 px-3 text-center">
                                       <span className="text-rose-600 font-bold">
@@ -734,7 +774,7 @@ export default function OrdersView({
                       <th className="py-3 px-4 font-bold">Produto</th>
                       <th className="py-3 px-3 font-bold">Segmento</th>
                       <th className="py-3 px-3 font-bold">Fornecedor</th>
-                      <th className="py-3 px-3 font-bold text-center">Estoque Atual</th>
+                      <th className="py-3 px-3 font-bold text-center">Estoque Geral (Total)</th>
                       <th className="py-3 px-3 font-bold text-center">Estoque Mínimo</th>
                       <th className="py-3 px-3 font-bold text-center">Déficit</th>
                       <th className="py-3 px-4 font-bold text-right">Qtd. a Pedir</th>
@@ -743,7 +783,7 @@ export default function OrdersView({
                   <tbody className="divide-y divide-slate-100">
                     {filteredItems.map(it => {
                       const p = it.product;
-                      const isZero = it.depositoStock === 0;
+                      const isZero = it.totalGeneralStock === 0;
 
                       return (
                         <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
@@ -775,14 +815,23 @@ export default function OrdersView({
                             )}
                           </td>
                           <td className="py-3 px-3 text-center">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded font-bold text-xs ${
-                              isZero ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {it.depositoStock}
-                            </span>
+                            <div className="flex flex-col items-center">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded font-bold text-xs ${
+                                isZero 
+                                  ? 'bg-rose-100 text-rose-700 border border-rose-300' 
+                                  : it.totalGeneralStock <= it.minStock 
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                                    : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {it.totalGeneralStock} un
+                              </span>
+                              <span className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
+                                Loja: {it.lojaStock} • Dep: {it.depositoStock}
+                              </span>
+                            </div>
                           </td>
                           <td className="py-3 px-3 text-center text-slate-600 font-semibold">
-                            {it.minStock}
+                            {it.minStock} un
                           </td>
                           <td className="py-3 px-3 text-center">
                             <span className="text-rose-600 font-bold">

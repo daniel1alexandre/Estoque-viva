@@ -485,7 +485,7 @@ export default function DailyCountView({
                     productId: product.id,
                     currentStock: product.currentStock,
                     entries: 0,
-                    outputCount: 0,
+                    outputCount: null,
                     countedStock: null,
                     difference: 0,
                     checked: false,
@@ -506,7 +506,7 @@ export default function DailyCountView({
                   // FORMULA: Diferença = Última Contagem - Contagem da Tarde
                   const diff = hasCount ? (countedStock - tardeCount) : 0;
 
-                  const hasTarde = item.outputCount !== 0 && item.outputCount !== null && item.outputCount !== undefined && item.outputCount !== '';
+                  const hasTarde = item.outputCount !== null && item.outputCount !== undefined && item.outputCount !== '';
 
                   return (
                     <tr
@@ -696,11 +696,20 @@ export default function DailyCountView({
                             <input
                               type="number"
                               min="0"
-                              value={item.outputCount === 0 || item.outputCount === null || item.outputCount === undefined ? '' : item.outputCount}
+                              value={item.outputCount === null || item.outputCount === undefined ? '' : item.outputCount}
                               placeholder="Digitar..."
                               onChange={(e) => {
-                                const val = e.target.value === '' ? 0 : Number(e.target.value);
-                                onUpdateItem(product.id, { outputCount: val });
+                                const val = e.target.value === '' ? null : Number(e.target.value);
+                                const currentCounted = item.countedStock;
+                                const hasCount = currentCounted !== null && currentCounted !== undefined && currentCounted !== '';
+                                const changes = { outputCount: val };
+
+                                // Regra: quando a contagem da tarde e a última contagem forem feitas e forem iguais, o check vai automático
+                                if (val !== null && hasCount && Number(val) === Number(currentCounted)) {
+                                  changes.checked = true;
+                                  changes.checkedAt = new Date().toISOString();
+                                }
+                                onUpdateItem(product.id, changes);
                               }}
                               className={`w-24 mx-auto text-center font-bold text-base rounded-lg py-1.5 px-2 border focus:outline-none focus:ring-2 transition shadow-xs ${
                                 hasTarde
@@ -719,10 +728,19 @@ export default function DailyCountView({
                               placeholder="Digitar..."
                               onChange={(e) => {
                                 const val = e.target.value === '' ? null : Number(e.target.value);
-                                onUpdateItem(product.id, { 
+                                const currentTarde = item.outputCount;
+                                const hasTarde = currentTarde !== null && currentTarde !== undefined && currentTarde !== '';
+                                const changes = { 
                                   countedStock: val,
                                   countedBy: currentUser.name
-                                });
+                                };
+
+                                // Regra: quando a contagem da tarde e a última contagem forem feitas e forem iguais, o check vai automático
+                                if (val !== null && hasTarde && Number(val) === Number(currentTarde)) {
+                                  changes.checked = true;
+                                  changes.checkedAt = new Date().toISOString();
+                                }
+                                onUpdateItem(product.id, changes);
                               }}
                               className={`w-24 mx-auto text-center font-bold text-base rounded-lg py-1.5 px-2 border focus:outline-none focus:ring-2 transition shadow-xs ${
                                 hasCount

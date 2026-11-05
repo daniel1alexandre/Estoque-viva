@@ -3,6 +3,7 @@ import Header from './components/Header';
 import DailyCountView from './components/DailyCountView';
 import DashboardView from './components/DashboardView';
 import OrdersView from './components/OrdersView';
+import GeneralStockView from './components/GeneralStockView';
 import ProductManagementModal from './components/ProductManagementModal';
 import UserManagementModal from './components/UserManagementModal';
 import SupplierManagementModal from './components/SupplierManagementModal';
@@ -533,6 +534,15 @@ export default function App() {
 
     // Diferença = (ultima contagem - contagem da tarde)
     updatedItem.difference = loc === 'deposito' ? 0 : (hasCount ? (numCounted - numTarde) : 0);
+
+    // Regra: quando a contagem da tarde e a última contagem forem feitas e forem iguais, o check vai automático
+    const hasTarde = updatedItem.outputCount !== null && updatedItem.outputCount !== undefined && updatedItem.outputCount !== '';
+    if (loc === 'loja' && hasTarde && hasCount && Number(updatedItem.outputCount) === Number(updatedItem.countedStock)) {
+      updatedItem.checked = true;
+      if (!updatedItem.checkedAt) {
+        updatedItem.checkedAt = new Date().toISOString();
+      }
+    }
 
     // Update UI state immediately
     setCountsHistory(prev => {
@@ -1218,22 +1228,100 @@ export default function App() {
     };
   }, [countsHistory.deposito, selectedDate, products]);
 
-  // Total items needing replenishment (Depósito stock <= minStock)
-  const ordersCount = useMemo(() => {
-    const depSession = countsHistory.deposito?.[selectedDate];
-    return products.filter(p => {
-      const it = depSession?.items?.[p.id];
-      let stock = p.currentStock || 0;
-      let entries = 0;
-      if (it) {
-        stock = Number(it.currentStock ?? p.currentStock) || 0;
-        entries = Number(it.entries) || 0;
+  // General Stock & Critical Alert Calculation (Alimentado por Loja + Depósito)
+  const generalStockStats = useMemo(() => {
+    const lojaSession = countsHistory.loja?.[selectedDate]?.items || {};
+    const depSession = countsHistory.deposito?.[selectedDate]?.items || {};
+
+    let criticalCount = 0;
+    let totalLoja = 0;
+    let totalDeposito = 0;
+
+    products.forEach(p => {
+      // 1. Loja Stock
+      const lojaItem = lojaSession[p.id];
+      let estoqueLoja = p.currentStock || 0;
+      if (lojaItem) {
+        const hasCount = lojaItem.countedStock !== null && lojaItem.countedStock !== undefined && lojaItem.countedStock !== '';
+        if (hasCount) {
+          estoqueLoja = Number(lojaItem.countedStock);
+        } else {
+          const cur = Number(lojaItem.currentStock ?? p.currentStock) || 0;
+          const ent = Number(lojaItem.entries) || 0;
+          const diff = Math.abs(Number(lojaItem.difference) || 0);
+          estoqueLoja = Math.max(0, cur + ent - diff);
+        }
       }
-      const totalStock = stock + entries;
+
+      // 2. Depósito Stock
+      const depItem = depSession[p.id];
+      let estoqueDeposito = 0;
+      if (depItem) {
+        const baseDep = Number(depItem.currentStock ?? p.currentStock) || 0;
+        const entriesDep = Number(depItem.entries) || 0;
+        estoqueDeposito = baseDep + entriesDep;
+      } else {
+        estoqueDeposito = p.currentStock || 0;
+      }
+
+      // 3. Estoque Geral
+      const totalGeral = estoqueLoja + estoqueDeposito;
       const minStock = Number(p.minStock) || 0;
-      return totalStock <= minStock;
+
+      if (totalGeral <= minStock) {
+        criticalCount++;
+      }
+
+      totalLoja += estoqueLoja;
+      totalDeposito += estoqueDeposito;
+    });
+
+    return {
+      criticalCount,
+      hasLowStock: criticalCount > 0,
+      totalLoja,
+      totalDeposito,
+      totalGeral: totalLoja + totalDeposito
+    };
+  }, [products, countsHistory, selectedDate]);
+
+  // Total items needing replenishment (Estoque Geral <= minStock OU Estoque Depósito <= minStock)
+  const ordersCount = useMemo(() => {
+    const lojaSession = countsHistory.loja?.[selectedDate]?.items || {};
+    const depSession = countsHistory.deposito?.[selectedDate]?.items || {};
+
+    return products.filter(p => {
+      // Loja
+      const lojaItem = lojaSession[p.id];
+      let estoqueLoja = p.currentStock || 0;
+      if (lojaItem) {
+        const hasCount = lojaItem.countedStock !== null && lojaItem.countedStock !== undefined && lojaItem.countedStock !== '';
+        if (hasCount) {
+          estoqueLoja = Number(lojaItem.countedStock);
+        } else {
+          const cur = Number(lojaItem.currentStock ?? p.currentStock) || 0;
+          const ent = Number(lojaItem.entries) || 0;
+          const diff = Math.abs(Number(lojaItem.difference) || 0);
+          estoqueLoja = Math.max(0, cur + ent - diff);
+        }
+      }
+
+      // Depósito
+      const depItem = depSession[p.id];
+      let estoqueDep = p.currentStock || 0;
+      let entriesDep = 0;
+      if (depItem) {
+        estoqueDep = Number(depItem.currentStock ?? p.currentStock) || 0;
+        entriesDep = Number(depItem.entries) || 0;
+      }
+      const totalDep = estoqueDep + entriesDep;
+
+      const totalGeral = estoqueLoja + totalDep;
+      const minStock = Number(p.minStock) || 0;
+
+      return totalGeral <= minStock || totalDep <= minStock;
     }).length;
-  }, [products, countsHistory.deposito, selectedDate]);
+  }, [products, countsHistory, selectedDate]);
 
   if (loading) {
     return (
@@ -1266,6 +1354,8 @@ export default function App() {
         summaryStats={summaryStats}
         depositoStats={depositoStats}
         ordersCount={ordersCount}
+        criticalGeneralCount={generalStockStats.criticalCount}
+        hasLowGeneralStock={generalStockStats.hasLowStock}
       />
 
       {/* Main container: Full Width utilizing all left and right margins */}
@@ -1299,6 +1389,14 @@ export default function App() {
             onToggleCheck={handleToggleCheck}
             onBatchCheck={handleBatchCheck}
             onSaveProduct={handleSaveProduct}
+          />
+        ) : activeTab === 'general_stock' ? (
+          <GeneralStockView
+            products={products}
+            categories={categories}
+            counts={countsHistory}
+            selectedDate={selectedDate}
+            onNavigateToOrders={() => setActiveTab('orders')}
           />
         ) : activeTab === 'orders' ? (
           <OrdersView

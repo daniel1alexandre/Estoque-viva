@@ -35,7 +35,9 @@ export default function Header({
   isFirebaseActive,
   summaryStats,
   depositoStats,
-  ordersCount = 0
+  ordersCount = 0,
+  criticalGeneralCount = 0,
+  hasLowGeneralStock = false
 }) {
   const currentUser = users.find(u => u.id === currentUserId) || users[0];
 
@@ -208,6 +210,41 @@ export default function Header({
                   }`}
                 >
                   {depositoStats.checkedCount}/{depositoStats.totalItems}
+                </span>
+              )}
+            </button>
+
+            {/* Estoque Geral Menu Button - Pisca quando algum produto estiver no estoque mínimo ou abaixo */}
+            <button
+              onClick={() => setActiveTab('general_stock')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                hasLowGeneralStock
+                  ? activeTab === 'general_stock'
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-500/30 ring-2 ring-rose-400 animate-pulse font-bold'
+                    : 'bg-rose-100 text-rose-800 border-2 border-rose-400 shadow-xs animate-pulse font-bold hover:bg-rose-200'
+                  : activeTab === 'general_stock'
+                    ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-500/20'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title={hasLowGeneralStock ? `ALERTA: ${criticalGeneralCount} produtos no estoque mínimo ou abaixo!` : 'Estoque Geral Integrado (Loja + Depósito)'}
+            >
+              <Boxes className={`w-4 h-4 ${hasLowGeneralStock ? 'text-rose-600 animate-bounce' : ''}`} />
+              <span>Estoque Geral</span>
+              {hasLowGeneralStock ? (
+                <span
+                  className="text-[11px] px-2 py-0.2 rounded-full font-black bg-rose-600 text-white shadow-xs animate-pulse"
+                >
+                  {criticalGeneralCount} mín!
+                </span>
+              ) : (
+                <span
+                  className={`text-[11px] px-2 py-0.2 rounded-full font-bold ${
+                    activeTab === 'general_stock'
+                      ? 'bg-indigo-500 text-white'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  Geral
                 </span>
               )}
             </button>
