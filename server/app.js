@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initialProducts, initialCategories, initialUsers } from './data/initialData.js';
+import { initialProducts, initialCategories, initialUsers, initialSuppliers } from './data/initialData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -97,6 +97,9 @@ function loadDatabase() {
       if (!parsed.counts.deposito) {
         parsed.counts.deposito = generateLocationHistory(parsed.products || initialProducts, parsed.users || initialUsers, 2.5);
       }
+      if (!parsed.suppliers) {
+        parsed.suppliers = initialSuppliers;
+      }
       return parsed;
     }
   } catch (err) {
@@ -107,6 +110,7 @@ function loadDatabase() {
     products: initialProducts,
     categories: initialCategories,
     users: initialUsers,
+    suppliers: initialSuppliers,
     counts: {
       loja: generateLocationHistory(initialProducts, initialUsers, 1),
       deposito: generateLocationHistory(initialProducts, initialUsers, 2.5)
@@ -345,7 +349,7 @@ app.post('/api/counts/batch-check', (req, res) => {
 });
 
 app.post('/api/products', (req, res) => {
-  const { id, code, name, category, unit, minStock, currentStock } = req.body;
+  const { id, code, name, category, unit, minStock, currentStock, supplierId, supplierName } = req.body;
   const clientId = req.headers['x-client-id'] || req.body.clientId;
   if (!name || !category) {
     return res.status(400).json({ error: 'Nome e categoria são obrigatórios' });
@@ -361,7 +365,9 @@ app.post('/api/products', (req, res) => {
         category,
         unit: unit || 'UN',
         minStock: Number(minStock) || 0,
-        currentStock: Number(currentStock) || 0
+        currentStock: Number(currentStock) || 0,
+        supplierId: supplierId !== undefined ? supplierId : db.products[index].supplierId,
+        supplierName: supplierName !== undefined ? supplierName : db.products[index].supplierName
       };
       saveDatabase(db, clientId);
       return res.json({ success: true, product: db.products[index] });
@@ -375,12 +381,39 @@ app.post('/api/products', (req, res) => {
     category,
     unit: unit || 'UN',
     minStock: Number(minStock) || 0,
-    currentStock: Number(currentStock) || 0
+    currentStock: Number(currentStock) || 0,
+    supplierId: supplierId || null,
+    supplierName: supplierName || null
   };
 
   db.products.push(newProduct);
   saveDatabase(db, clientId);
   res.status(201).json({ success: true, product: newProduct });
+});
+
+// Bulk assign supplier to products
+app.post('/api/products/batch-supplier', (req, res) => {
+  const { productIds, category, supplierId, supplierName } = req.body;
+  const clientId = req.headers['x-client-id'] || req.body.clientId;
+
+  let count = 0;
+  db.products.forEach(p => {
+    let match = false;
+    if (productIds && Array.isArray(productIds) && productIds.includes(p.id)) {
+      match = true;
+    } else if (category && p.category === category) {
+      match = true;
+    }
+
+    if (match) {
+      p.supplierId = supplierId || null;
+      p.supplierName = supplierName || null;
+      count++;
+    }
+  });
+
+  saveDatabase(db, clientId);
+  res.json({ success: true, count, products: db.products });
 });
 
 app.delete('/api/products/:id', (req, res) => {
@@ -431,6 +464,87 @@ app.delete('/api/users/:id', (req, res) => {
   db.users = db.users.filter(u => u.id !== id);
   saveDatabase(db, clientId);
   res.json({ success: true, message: 'Usuário excluído com sucesso' });
+});
+
+// Suppliers CRUD
+app.get('/api/suppliers', (req, res) => {
+  if (!db.suppliers) {
+    db.suppliers = initialSuppliers;
+  }
+  res.json(db.suppliers);
+});
+
+app.post('/api/suppliers', (req, res) => {
+  const { id, name, contact, phone, email, category, notes } = req.body;
+  const clientId = req.headers['x-client-id'] || req.body.clientId;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Nome do fornecedor é obrigatório' });
+  }
+
+  if (!db.suppliers) {
+    db.suppliers = initialSuppliers;
+  }
+
+  if (id) {
+    const idx = db.suppliers.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      db.suppliers[idx] = {
+        ...db.suppliers[idx],
+        name: name.trim(),
+        contact: contact ? contact.trim() : '',
+        phone: phone ? phone.trim() : '',
+        email: email ? email.trim() : '',
+        category: category || '',
+        notes: notes || ''
+      };
+
+      // Also update supplierName in products associated with this supplier
+      db.products.forEach(p => {
+        if (p.supplierId === id) {
+          p.supplierName = name.trim();
+        }
+      });
+
+      saveDatabase(db, clientId);
+      return res.json({ success: true, supplier: db.suppliers[idx] });
+    }
+  }
+
+  const newSupplier = {
+    id: 'sup-' + Date.now(),
+    name: name.trim(),
+    contact: contact ? contact.trim() : '',
+    phone: phone ? phone.trim() : '',
+    email: email ? email.trim() : '',
+    category: category || '',
+    notes: notes || ''
+  };
+
+  db.suppliers.push(newSupplier);
+  saveDatabase(db, clientId);
+  res.status(201).json({ success: true, supplier: newSupplier });
+});
+
+app.delete('/api/suppliers/:id', (req, res) => {
+  const { id } = req.params;
+  const clientId = req.headers['x-client-id'];
+  
+  if (!db.suppliers) {
+    db.suppliers = initialSuppliers;
+  }
+  
+  db.suppliers = db.suppliers.filter(s => s.id !== id);
+  // Unlink products associated with deleted supplier
+  db.products.forEach(p => {
+    if (p.supplierId === id) {
+      p.supplierId = null;
+      p.supplierName = null;
+    }
+  });
+
+  saveDatabase(db, clientId);
+  res.json({ success: true, message: 'Fornecedor excluído com sucesso' });
 });
 
 app.post('/api/reset-clean', (req, res) => {

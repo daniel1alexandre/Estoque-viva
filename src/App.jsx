@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Header from './components/Header';
 import DailyCountView from './components/DailyCountView';
 import DashboardView from './components/DashboardView';
+import OrdersView from './components/OrdersView';
 import ProductManagementModal from './components/ProductManagementModal';
 import UserManagementModal from './components/UserManagementModal';
+import SupplierManagementModal from './components/SupplierManagementModal';
 import ExportModal from './components/ExportModal';
 import FirebaseConfigModal from './components/FirebaseConfigModal';
 import { getTodayDateString } from './utils/formatters';
@@ -18,6 +20,8 @@ import {
   saveCategoriesToFirestore,
   saveUserToFirestore,
   deleteUserFromFirestore,
+  saveSupplierToFirestore,
+  deleteSupplierFromFirestore,
   subscribeToRealtimeFirestore,
   resetAllStockAndCountsInFirestore
 } from './services/firebase';
@@ -76,6 +80,7 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   // Structure: { loja: { [date]: session }, deposito: { [date]: session } }
   const [countsHistory, setCountsHistory] = useState({ loja: {}, deposito: {} });
   const [currentUserId, setCurrentUserId] = useState('');
@@ -85,6 +90,7 @@ export default function App() {
   // Modals
   const [isProductsModalOpen, setIsProductsModalOpen] = useState(false);
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
+  const [isSuppliersModalOpen, setIsSuppliersModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isFirebaseModalOpen, setIsFirebaseModalOpen] = useState(false);
   const [isFirebaseActive, setIsFirebaseActive] = useState(isFirebaseConfigured());
@@ -128,6 +134,7 @@ export default function App() {
       const cachedProds = localStorage.getItem('viva_products');
       const cachedCats = localStorage.getItem('viva_categories');
       const cachedUsers = localStorage.getItem('viva_users');
+      const cachedSups = localStorage.getItem('viva_suppliers');
 
       if (!isFirstReset && cachedCounts) {
         setCountsHistory(JSON.parse(cachedCounts));
@@ -142,6 +149,7 @@ export default function App() {
       }
       if (cachedCats) setCategories(JSON.parse(cachedCats));
       if (cachedUsers) setUsers(JSON.parse(cachedUsers));
+      if (cachedSups) setSuppliers(JSON.parse(cachedSups));
     } catch (e) {
       console.warn('Erro ao ler cache local inicial:', e);
     }
@@ -163,6 +171,10 @@ export default function App() {
           setProducts(loadedProds);
           setCategories(fbData.categories || []);
           setUsers(fbData.users || []);
+          if (fbData.suppliers && fbData.suppliers.length > 0) {
+            setSuppliers(fbData.suppliers);
+            try { localStorage.setItem('viva_suppliers', JSON.stringify(fbData.suppliers)); } catch (e) {}
+          }
           const initialCounts = isFirstReset ? { loja: {}, deposito: {} } : (fbData.counts || {});
           setCountsHistory(prev => {
             const merged = mergeCountsHistory(prev, initialCounts);
@@ -193,6 +205,10 @@ export default function App() {
         if (prods.length > 0) setProducts(prods);
         if (data.categories && data.categories.length > 0) setCategories(data.categories);
         if (data.users && data.users.length > 0) setUsers(data.users);
+        if (data.suppliers && data.suppliers.length > 0) {
+          setSuppliers(data.suppliers);
+          try { localStorage.setItem('viva_suppliers', JSON.stringify(data.suppliers)); } catch (e) {}
+        }
 
         let normalizedCounts = { loja: {}, deposito: {} };
         if (!isFirstReset && data.counts) {
@@ -255,6 +271,10 @@ export default function App() {
         onUsers: (liveUsers) => {
           setUsers(liveUsers);
           try { localStorage.setItem('viva_users', JSON.stringify(liveUsers)); } catch (e) {}
+        },
+        onSuppliers: (liveSuppliers) => {
+          setSuppliers(liveSuppliers);
+          try { localStorage.setItem('viva_suppliers', JSON.stringify(liveSuppliers)); } catch (e) {}
         }
       });
 
@@ -293,6 +313,7 @@ export default function App() {
                 if (latest.products) setProducts(latest.products);
                 if (latest.categories) setCategories(latest.categories);
                 if (latest.users) setUsers(latest.users);
+                if (latest.suppliers) setSuppliers(latest.suppliers);
               })
               .catch(() => {});
           }
@@ -954,6 +975,110 @@ export default function App() {
     }
   };
 
+  // Supplier management handlers
+  const handleSaveSupplier = async (supplierData) => {
+    let savedSup = supplierData;
+    if (!savedSup.id) {
+      savedSup = { ...savedSup, id: 'sup-' + Date.now() };
+    }
+
+    setSuppliers(prev => {
+      const idx = prev.findIndex(s => s.id === savedSup.id);
+      const next = [...prev];
+      if (idx !== -1) {
+        next[idx] = savedSup;
+      } else {
+        next.push(savedSup);
+      }
+      try { localStorage.setItem('viva_suppliers', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
+    try {
+      const res = await fetch(`${API_BASE}/suppliers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Id': clientIdRef.current
+        },
+        body: JSON.stringify(supplierData)
+      });
+      const data = await res.json();
+      if (data.supplier) {
+        savedSup = data.supplier;
+        setSuppliers(prev => {
+          const next = prev.map(s => s.id === savedSup.id ? savedSup : s);
+          try { localStorage.setItem('viva_suppliers', JSON.stringify(next)); } catch (e) {}
+          return next;
+        });
+      }
+      if (isFirebaseConfigured()) {
+        saveSupplierToFirestore(savedSup);
+      }
+    } catch (err) {
+      console.error('Erro ao salvar fornecedor:', err);
+      if (isFirebaseConfigured()) {
+        saveSupplierToFirestore(savedSup);
+      }
+    }
+  };
+
+  const handleDeleteSupplier = async (supplierId) => {
+    setSuppliers(prev => {
+      const next = prev.filter(s => s.id !== supplierId);
+      try { localStorage.setItem('viva_suppliers', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
+    try {
+      await fetch(`${API_BASE}/suppliers/${supplierId}`, {
+        method: 'DELETE',
+        headers: { 'X-Client-Id': clientIdRef.current }
+      });
+      if (isFirebaseConfigured()) {
+        deleteSupplierFromFirestore(supplierId);
+      }
+    } catch (err) {
+      console.error('Erro ao excluir fornecedor:', err);
+      if (isFirebaseConfigured()) {
+        deleteSupplierFromFirestore(supplierId);
+      }
+    }
+  };
+
+  const handleBatchAssignSupplierCategory = async (category, supplierId, supplierName) => {
+    setProducts(prev => {
+      const next = prev.map(p => {
+        if (p.category === category) {
+          return { ...p, supplierId, supplierName };
+        }
+        return p;
+      });
+      try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
+    try {
+      await fetch(`${API_BASE}/products/batch-supplier`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Id': clientIdRef.current
+        },
+        body: JSON.stringify({ category, supplierId, supplierName })
+      });
+      if (isFirebaseConfigured()) {
+        products.forEach(p => {
+          if (p.category === category) {
+            saveProductToFirestore({ ...p, supplierId, supplierName });
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Erro ao vincular categoria ao fornecedor:', err);
+    }
+  };
+
   const handleResetAllValues = async () => {
     if (!window.confirm('Tem certeza que deseja zerar todos os estoques e contagens de todos os produtos? Todos os cadastros serão mantidos, mas todos os valores serão zerados a partir de agora.')) {
       return;
@@ -1025,6 +1150,23 @@ export default function App() {
     };
   }, [countsHistory.deposito, selectedDate, products]);
 
+  // Total items needing replenishment (Depósito stock <= minStock)
+  const ordersCount = useMemo(() => {
+    const depSession = countsHistory.deposito?.[selectedDate];
+    return products.filter(p => {
+      const it = depSession?.items?.[p.id];
+      let stock = p.currentStock || 0;
+      let entries = 0;
+      if (it) {
+        stock = Number(it.currentStock ?? p.currentStock) || 0;
+        entries = Number(it.entries) || 0;
+      }
+      const totalStock = stock + entries;
+      const minStock = Number(p.minStock) || 0;
+      return totalStock <= minStock;
+    }).length;
+  }, [products, countsHistory.deposito, selectedDate]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -1049,11 +1191,13 @@ export default function App() {
         saveStatus={saveStatus}
         onOpenProducts={() => setIsProductsModalOpen(true)}
         onOpenUsers={() => setIsUsersModalOpen(true)}
+        onOpenSuppliers={() => setIsSuppliersModalOpen(true)}
         onOpenExport={() => setIsExportModalOpen(true)}
         onOpenFirebase={() => setIsFirebaseModalOpen(true)}
         isFirebaseActive={isFirebaseActive}
         summaryStats={summaryStats}
         depositoStats={depositoStats}
+        ordersCount={ordersCount}
       />
 
       {/* Main container: Full Width utilizing all left and right margins */}
@@ -1088,6 +1232,15 @@ export default function App() {
             onBatchCheck={handleBatchCheck}
             onSaveProduct={handleSaveProduct}
           />
+        ) : activeTab === 'orders' ? (
+          <OrdersView
+            products={products}
+            categories={categories}
+            suppliers={suppliers}
+            counts={countsHistory}
+            selectedDate={selectedDate}
+            onOpenSuppliersModal={() => setIsSuppliersModalOpen(true)}
+          />
         ) : (
           <DashboardView
             products={products}
@@ -1104,6 +1257,7 @@ export default function App() {
         onClose={() => setIsProductsModalOpen(false)}
         products={products}
         categories={categories}
+        suppliers={suppliers}
         onSaveProduct={handleSaveProduct}
         onDeleteProduct={handleDeleteProduct}
         onAddCategory={handleAddCategory}
@@ -1117,6 +1271,17 @@ export default function App() {
         users={users}
         onAddUser={handleAddUser}
         onDeleteUser={handleDeleteUser}
+      />
+
+      <SupplierManagementModal
+        isOpen={isSuppliersModalOpen}
+        onClose={() => setIsSuppliersModalOpen(false)}
+        suppliers={suppliers}
+        categories={categories}
+        products={products}
+        onSaveSupplier={handleSaveSupplier}
+        onDeleteSupplier={handleDeleteSupplier}
+        onBatchAssignCategory={handleBatchAssignSupplierCategory}
       />
 
       <ExportModal

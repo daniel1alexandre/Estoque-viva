@@ -114,7 +114,15 @@ export async function loadDataFromFirestore() {
       products.push({ id: d.id, ...d.data() });
     });
 
-    // 4. Counts (Daily sessions: documents with id `loja_{date}` or `deposito_{date}`)
+    // 4. Suppliers
+    const supsCol = collection(db, 'suppliers');
+    const supsSnap = await getDocs(supsCol);
+    let suppliers = [];
+    supsSnap.forEach(d => {
+      suppliers.push({ id: d.id, ...d.data() });
+    });
+
+    // 5. Counts (Daily sessions: documents with id `loja_{date}` or `deposito_{date}`)
     const countsCol = collection(db, 'counts');
     const countsSnap = await getDocs(countsCol);
     const counts = { loja: {}, deposito: {} };
@@ -133,6 +141,7 @@ export async function loadDataFromFirestore() {
       products,
       categories,
       users,
+      suppliers,
       counts
     };
   } catch (err) {
@@ -243,6 +252,23 @@ export async function deleteUserFromFirestore(userId) {
   await deleteDoc(userRef);
 }
 
+// Suppliers CRUD
+export async function saveSupplierToFirestore(supplier) {
+  const db = getDb();
+  if (!db) return;
+  const supId = supplier.id || 'sup-' + Date.now();
+  const supRef = doc(db, 'suppliers', supId);
+  await setDoc(supRef, { ...supplier, id: supId }, { merge: true });
+  return { ...supplier, id: supId };
+}
+
+export async function deleteSupplierFromFirestore(supplierId) {
+  const db = getDb();
+  if (!db) return;
+  const supRef = doc(db, 'suppliers', supplierId);
+  await deleteDoc(supRef);
+}
+
 // Seed initial data to Firebase Cloud Firestore (1-click sync)
 export async function seedDataToFirestore(products, categories, users, counts) {
   const db = getDb();
@@ -314,7 +340,7 @@ export async function resetAllStockAndCountsInFirestore() {
 }
 
 // Real-time synchronization across devices via Firestore onSnapshot
-export function subscribeToRealtimeFirestore({ onCounts, onProducts, onCategories, onUsers }) {
+export function subscribeToRealtimeFirestore({ onCounts, onProducts, onCategories, onUsers, onSuppliers }) {
   const db = getDb();
   if (!db) return () => {};
 
@@ -384,7 +410,26 @@ export function subscribeToRealtimeFirestore({ onCounts, onProducts, onCategorie
     }
   }
 
-  // 4. Listen to categories metadata
+  // 4. Listen to suppliers collection
+  if (onSuppliers) {
+    try {
+      const supsCol = collection(db, 'suppliers');
+      const unsubSups = onSnapshot(supsCol, (snap) => {
+        const list = [];
+        snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+        if (list.length > 0) {
+          onSuppliers(list);
+        }
+      }, (err) => {
+        console.warn('Aviso: listener de fornecedores Firestore:', err);
+      });
+      unsubs.push(unsubSups);
+    } catch (e) {
+      console.warn('Erro ao registrar listener de fornecedores:', e);
+    }
+  }
+
+  // 5. Listen to categories metadata
   if (onCategories) {
     try {
       const metaRef = doc(db, 'settings', 'metadata');

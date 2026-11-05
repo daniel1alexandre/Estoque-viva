@@ -6,6 +6,7 @@ export default function ProductManagementModal({
   onClose,
   products,
   categories,
+  suppliers = [],
   onSaveProduct,
   onDeleteProduct,
   onAddCategory,
@@ -25,6 +26,7 @@ export default function ProductManagementModal({
   const [newUnit, setNewUnit] = useState('UN');
   const [newMinStock, setNewMinStock] = useState('10');
   const [newCurrentStock, setNewCurrentStock] = useState('50');
+  const [newSupplierId, setNewSupplierId] = useState('');
 
   // Inline edit row form fields
   const [editName, setEditName] = useState('');
@@ -32,6 +34,7 @@ export default function ProductManagementModal({
   const [editUnit, setEditUnit] = useState('UN');
   const [editMinStock, setEditMinStock] = useState('10');
   const [editStock, setEditStock] = useState('0');
+  const [editSupplierId, setEditSupplierId] = useState('');
 
   if (!isOpen) return null;
 
@@ -50,10 +53,13 @@ export default function ProductManagementModal({
     setEditUnit(prod.unit || 'UN');
     setEditMinStock(String(prod.minStock || 0));
     setEditStock(String(prod.currentStock || 0));
+    setEditSupplierId(prod.supplierId || '');
   };
 
   const handleSaveInlineEdit = (prodId) => {
     if (!editName.trim()) return;
+
+    const matchedSup = suppliers.find(s => s.id === editSupplierId);
 
     onSaveProduct({
       id: prodId,
@@ -61,7 +67,9 @@ export default function ProductManagementModal({
       category: editCategory,
       unit: editUnit.trim() || 'UN',
       minStock: Number(editMinStock) || 0,
-      currentStock: Number(editStock) || 0
+      currentStock: Number(editStock) || 0,
+      supplierId: editSupplierId || null,
+      supplierName: matchedSup ? matchedSup.name : null
     });
 
     setEditingProductId(null);
@@ -75,18 +83,23 @@ export default function ProductManagementModal({
     setNewUnit('UN');
     setNewMinStock('10');
     setNewCurrentStock('50');
+    setNewSupplierId('');
   };
 
   const handleSaveNewProduct = (e) => {
     e.preventDefault();
     if (!newName.trim()) return;
 
+    const matchedSup = suppliers.find(s => s.id === newSupplierId);
+
     onSaveProduct({
       name: newName.trim(),
       category: newCategory,
       unit: newUnit.trim() || 'UN',
       minStock: Number(newMinStock) || 0,
-      currentStock: Number(newCurrentStock) || 0
+      currentStock: Number(newCurrentStock) || 0,
+      supplierId: newSupplierId || null,
+      supplierName: matchedSup ? matchedSup.name : null
     });
 
     setIsCreatingNew(false);
@@ -277,7 +290,7 @@ export default function ProductManagementModal({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Nome do Produto *</label>
                   <input
@@ -305,14 +318,17 @@ export default function ProductManagementModal({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Estoque Inicial</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={newCurrentStock}
-                    onChange={(e) => setNewCurrentStock(e.target.value)}
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Fornecedor</label>
+                  <select
+                    value={newSupplierId}
+                    onChange={(e) => setNewSupplierId(e.target.value)}
                     className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 bg-white"
-                  />
+                  >
+                    <option value="">Padrão da categoria</option>
+                    {suppliers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -352,6 +368,7 @@ export default function ProductManagementModal({
                 <tr>
                   <th className="py-2.5 px-3">Nome do Produto</th>
                   <th className="py-2.5 px-3">Categoria</th>
+                  <th className="py-2.5 px-3">Fornecedor</th>
                   <th className="py-2.5 px-3 text-center">Estoque Atual</th>
                   <th className="py-2.5 px-3 text-center">Estoque Mínimo</th>
                   <th className="py-2.5 px-3 text-right">Ações</th>
@@ -360,6 +377,9 @@ export default function ProductManagementModal({
               <tbody className="divide-y divide-slate-100">
                 {filteredList.map(p => {
                   const isEditingThisRow = editingProductId === p.id;
+                  const assignedSup = suppliers.find(s => s.id === p.supplierId) || 
+                                      suppliers.find(s => s.name === p.supplierName) ||
+                                      suppliers.find(s => s.category === p.category);
 
                   // Render inline edit row directly where the item is located!
                   if (isEditingThisRow) {
@@ -386,6 +406,20 @@ export default function ProductManagementModal({
                           >
                             {categories.map(c => (
                               <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </td>
+
+                        {/* Fornecedor select */}
+                        <td className="py-2 px-3">
+                          <select
+                            value={editSupplierId}
+                            onChange={(e) => setEditSupplierId(e.target.value)}
+                            className="w-full text-xs border border-blue-400 rounded-md px-2 py-1.5 bg-white font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">Padrão da categoria</option>
+                            {suppliers.map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
                           </select>
                         </td>
@@ -445,6 +479,15 @@ export default function ProductManagementModal({
                         <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-medium">
                           {p.category}
                         </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        {assignedSup ? (
+                          <span className="text-[11px] font-semibold text-orange-800 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200">
+                            {assignedSup.name}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic">Não vinculado</span>
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-center font-bold text-slate-800">{p.currentStock}</td>
                       <td className="py-2.5 px-3 text-center text-slate-500 font-medium">{p.minStock || 0}</td>

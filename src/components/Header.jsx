@@ -12,7 +12,9 @@ import {
   Warehouse, 
   Boxes, 
   Store,
-  Flame
+  Flame,
+  ShoppingCart,
+  Building2
 } from 'lucide-react';
 import { formatDateBR } from '../utils/formatters';
 
@@ -27,11 +29,13 @@ export default function Header({
   saveStatus,
   onOpenProducts,
   onOpenUsers,
+  onOpenSuppliers,
   onOpenExport,
   onOpenFirebase,
   isFirebaseActive,
   summaryStats,
-  depositoStats
+  depositoStats,
+  ordersCount = 0
 }) {
   const currentUser = users.find(u => u.id === currentUserId) || users[0];
 
@@ -124,6 +128,15 @@ export default function Header({
             </button>
 
             <button
+              onClick={onOpenSuppliers}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition shadow-2xs cursor-pointer"
+              title="Cadastrar e gerenciar fornecedores para pedidos de compra"
+            >
+              <Building2 className="w-3.5 h-3.5 text-orange-600" />
+              <span>Fornecedores</span>
+            </button>
+
+            <button
               onClick={onOpenExport}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition shadow-2xs cursor-pointer"
               title="Exportar dados da contagem para Excel/CSV"
@@ -195,6 +208,41 @@ export default function Header({
                   }`}
                 >
                   {depositoStats.checkedCount}/{depositoStats.totalItems}
+                </span>
+              )}
+            </button>
+
+            {/* Pedidos Menu Button */}
+            <button
+              onClick={() => setActiveTab('orders')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                activeTab === 'orders'
+                  ? 'bg-orange-600 text-white shadow-xs shadow-orange-500/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <ShoppingCart className="w-4 h-4" />
+              <span>Pedidos</span>
+              {ordersCount > 0 ? (
+                <span
+                  className={`text-[11px] px-2 py-0.2 rounded-full font-bold ${
+                    activeTab === 'orders'
+                      ? 'bg-white text-orange-700'
+                      : 'bg-rose-500 text-white animate-pulse'
+                  }`}
+                  title={`${ordersCount} produtos precisam de reposição`}
+                >
+                  {ordersCount}
+                </span>
+              ) : (
+                <span
+                  className={`text-[11px] px-2 py-0.2 rounded-full font-bold ${
+                    activeTab === 'orders'
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  0
                 </span>
               )}
             </button>
