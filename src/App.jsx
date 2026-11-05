@@ -434,16 +434,18 @@ export default function App() {
     };
 
     // Formulas requested by user:
-    // Estoque Final = Última Contagem
     const numCurrent = Number(updatedItem.currentStock) || 0;
     const numEntries = Number(updatedItem.entries) || 0;
     const numTarde = Number(updatedItem.outputCount) || 0;
     const hasCount = updatedItem.countedStock !== null && updatedItem.countedStock !== undefined && updatedItem.countedStock !== '';
     const numCounted = hasCount ? Number(updatedItem.countedStock) : 0;
-    const estoqueFinal = hasCount ? numCounted : numCurrent;
+    
+    // For Depósito: Estoque Final = currentStock + entries
+    // For Loja: Estoque Final = hasCount ? numCounted : numCurrent
+    const estoqueFinal = loc === 'deposito' ? (numCurrent + numEntries) : (hasCount ? numCounted : numCurrent);
 
     // Diferença = (ultima contagem - contagem da tarde)
-    updatedItem.difference = hasCount ? (numCounted - numTarde) : 0;
+    updatedItem.difference = loc === 'deposito' ? 0 : (hasCount ? (numCounted - numTarde) : 0);
 
     // Update UI state immediately
     setCountsHistory(prev => {
@@ -460,8 +462,13 @@ export default function App() {
         }
       };
 
-      // Chain rule: if countedStock was changed, propagate to the immediately following date as its initial stock!
-      if (hasCount) {
+      // Chain rule:
+      // In Depósito: propagate (currentStock + entries) to the immediately following date as its initial stock!
+      // In Loja: propagate countedStock if hasCount
+      const shouldPropagate = loc === 'deposito' || hasCount;
+      const finalStockToPropagate = loc === 'deposito' ? (numCurrent + numEntries) : Number(updatedItem.countedStock);
+
+      if (shouldPropagate) {
         const futureDates = Object.keys(updatedLoc)
           .filter(d => d > selectedDate)
           .sort((a, b) => a.localeCompare(b));
@@ -471,7 +478,7 @@ export default function App() {
           const nextSess = updatedLoc[nextDate];
           if (nextSess && nextSess.items && nextSess.items[productId]) {
             const nextIt = { ...nextSess.items[productId] };
-            nextIt.currentStock = Number(updatedItem.countedStock);
+            nextIt.currentStock = finalStockToPropagate;
             const nextGeral = nextIt.currentStock + (Number(nextIt.entries) || 0) - (Number(nextIt.outputCount) || 0);
             if (nextIt.countedStock !== null && nextIt.countedStock !== undefined && nextIt.countedStock !== '') {
               nextIt.difference = Number(nextIt.countedStock) - nextGeral;
