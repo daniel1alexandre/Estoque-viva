@@ -9,6 +9,7 @@ import SupplierManagementModal from './components/SupplierManagementModal';
 import ExportModal from './components/ExportModal';
 import FirebaseConfigModal from './components/FirebaseConfigModal';
 import { getTodayDateString } from './utils/formatters';
+import { initialSuppliers } from './data/initialData';
 import {
   isFirebaseConfigured,
   initFirebase,
@@ -80,7 +81,7 @@ export default function App() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
-  const [suppliers, setSuppliers] = useState([]);
+  const [suppliers, setSuppliers] = useState(initialSuppliers);
   // Structure: { loja: { [date]: session }, deposito: { [date]: session } }
   const [countsHistory, setCountsHistory] = useState({ loja: {}, deposito: {} });
   const [currentUserId, setCurrentUserId] = useState('');
@@ -149,7 +150,20 @@ export default function App() {
       }
       if (cachedCats) setCategories(JSON.parse(cachedCats));
       if (cachedUsers) setUsers(JSON.parse(cachedUsers));
-      if (cachedSups) setSuppliers(JSON.parse(cachedSups));
+      if (cachedSups) {
+        try {
+          const parsedSups = JSON.parse(cachedSups);
+          if (Array.isArray(parsedSups) && parsedSups.length > 0) {
+            setSuppliers(parsedSups);
+          } else {
+            setSuppliers(initialSuppliers);
+          }
+        } catch (e) {
+          setSuppliers(initialSuppliers);
+        }
+      } else {
+        setSuppliers(initialSuppliers);
+      }
     } catch (e) {
       console.warn('Erro ao ler cache local inicial:', e);
     }
@@ -174,6 +188,12 @@ export default function App() {
           if (fbData.suppliers && fbData.suppliers.length > 0) {
             setSuppliers(fbData.suppliers);
             try { localStorage.setItem('viva_suppliers', JSON.stringify(fbData.suppliers)); } catch (e) {}
+          } else {
+            setSuppliers(initialSuppliers);
+            try {
+              localStorage.setItem('viva_suppliers', JSON.stringify(initialSuppliers));
+              initialSuppliers.forEach(s => saveSupplierToFirestore(s));
+            } catch (e) {}
           }
           const initialCounts = isFirstReset ? { loja: {}, deposito: {} } : (fbData.counts || {});
           setCountsHistory(prev => {
@@ -208,6 +228,8 @@ export default function App() {
         if (data.suppliers && data.suppliers.length > 0) {
           setSuppliers(data.suppliers);
           try { localStorage.setItem('viva_suppliers', JSON.stringify(data.suppliers)); } catch (e) {}
+        } else {
+          setSuppliers(initialSuppliers);
         }
 
         let normalizedCounts = { loja: {}, deposito: {} };
@@ -1287,6 +1309,19 @@ export default function App() {
             selectedDate={selectedDate}
             onOpenSuppliersModal={() => setIsSuppliersModalOpen(true)}
             onSaveProduct={handleSaveProduct}
+          />
+        ) : activeTab === 'suppliers' ? (
+          <SupplierManagementModal
+            isModal={false}
+            isOpen={true}
+            onClose={() => setActiveTab('orders')}
+            suppliers={suppliers}
+            categories={categories}
+            products={products}
+            onSaveSupplier={handleSaveSupplier}
+            onDeleteSupplier={handleDeleteSupplier}
+            onBatchAssignCategory={handleBatchAssignSupplierCategory}
+            onAssignProductsToSupplier={handleAssignProductsToSupplier}
           />
         ) : (
           <DashboardView

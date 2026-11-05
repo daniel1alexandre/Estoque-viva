@@ -247,6 +247,19 @@ export default function Header({
               )}
             </button>
 
+            {/* Fornecedores Menu Button */}
+            <button
+              onClick={() => setActiveTab('suppliers')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                activeTab === 'suppliers'
+                  ? 'bg-orange-600 text-white shadow-xs shadow-orange-500/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Building2 className="w-4 h-4" />
+              <span>Fornecedores</span>
+            </button>
+
             {/* Dashboard */}
             <button
               onClick={() => setActiveTab('dashboard')}
