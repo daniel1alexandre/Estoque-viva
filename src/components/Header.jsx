@@ -14,7 +14,8 @@ import {
   Store,
   Flame,
   ShoppingCart,
-  Building2
+  Building2,
+  FileText
 } from 'lucide-react';
 import { formatDateBR } from '../utils/formatters';
 
@@ -308,6 +309,20 @@ export default function Header({
             >
               <BarChart3 className="w-4 h-4" />
               <span>Dashboard de Saídas</span>
+            </button>
+
+            {/* Relatórios Personalizados Menu Button */}
+            <button
+              onClick={() => setActiveTab('reports')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                activeTab === 'reports'
+                  ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-500/20'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Central de relatórios personalizados (monte o que você precisa observar)"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Relatórios</span>
             </button>
           </nav>
 

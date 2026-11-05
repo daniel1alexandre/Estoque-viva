@@ -153,6 +153,10 @@ export default function OrdersView({
       const matchCat = filterCategory === 'ALL' || item.product.category === filterCategory;
 
       return matchSearch && matchSup && matchCat;
+    }).sort((a, b) => {
+      const c = (a.product.category || '').localeCompare(b.product.category || '', 'pt-BR', { sensitivity: 'base' });
+      if (c !== 0) return c;
+      return (a.product.name || '').localeCompare(b.product.name || '', 'pt-BR', { sensitivity: 'base' });
     });
   }, [orderItems, searchTerm, filterSupplier, filterCategory]);
 
@@ -170,10 +174,13 @@ export default function OrdersView({
       }
       groups[supKey].items.push(item);
     });
-    return Object.values(groups).sort((a, b) => {
+    return Object.values(groups).map(g => ({
+      ...g,
+      items: g.items.sort((a, b) => a.product.name.localeCompare(b.product.name, 'pt-BR', { sensitivity: 'base' }))
+    })).sort((a, b) => {
       if (a.supplier && !b.supplier) return -1;
       if (!a.supplier && b.supplier) return 1;
-      return a.supplierName.localeCompare(b.supplierName);
+      return a.supplierName.localeCompare(b.supplierName, 'pt-BR', { sensitivity: 'base' });
     });
   }, [filteredItems]);
 
@@ -190,7 +197,10 @@ export default function OrdersView({
       }
       groups[cat].items.push(item);
     });
-    return Object.values(groups).sort((a, b) => a.category.localeCompare(b.category));
+    return Object.values(groups).map(g => ({
+      ...g,
+      items: g.items.sort((a, b) => a.product.name.localeCompare(b.product.name, 'pt-BR', { sensitivity: 'base' }))
+    })).sort((a, b) => a.category.localeCompare(b.category, 'pt-BR', { sensitivity: 'base' }));
   }, [filteredItems]);
 
   // Copy formatted WhatsApp order to clipboard

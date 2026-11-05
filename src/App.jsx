@@ -4,6 +4,7 @@ import DailyCountView from './components/DailyCountView';
 import DashboardView from './components/DashboardView';
 import OrdersView from './components/OrdersView';
 import GeneralStockView from './components/GeneralStockView';
+import ReportsView from './components/ReportsView';
 import ProductManagementModal from './components/ProductManagementModal';
 import UserManagementModal from './components/UserManagementModal';
 import SupplierManagementModal from './components/SupplierManagementModal';
@@ -102,6 +103,19 @@ export default function App() {
 
   // Active location: 'loja' or 'deposito'
   const currentLocation = activeTab === 'deposito' ? 'deposito' : 'loja';
+
+  // Regra de ordenação alfabética rigorosa: Categorias (A-Z) e Produtos dentro de cada categoria (A-Z)
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+  }, [categories]);
+
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
+      const catComp = (a.category || '').localeCompare(b.category || '', 'pt-BR', { sensitivity: 'base' });
+      if (catComp !== 0) return catComp;
+      return (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' });
+    });
+  }, [products]);
 
   // Fetch full data on initial mount or reload
   const loadData = useCallback(async () => {
@@ -1365,8 +1379,8 @@ export default function App() {
             key={`loja-${selectedDate}`}
             selectedDate={selectedDate}
             location="loja"
-            products={products}
-            categories={categories}
+            products={sortedProducts}
+            categories={sortedCategories}
             users={users}
             currentUserId={currentUserId}
             countData={currentCountData}
@@ -1380,8 +1394,8 @@ export default function App() {
             key={`deposito-${selectedDate}`}
             selectedDate={selectedDate}
             location="deposito"
-            products={products}
-            categories={categories}
+            products={sortedProducts}
+            categories={sortedCategories}
             users={users}
             currentUserId={currentUserId}
             countData={currentCountData}
@@ -1392,16 +1406,16 @@ export default function App() {
           />
         ) : activeTab === 'general_stock' ? (
           <GeneralStockView
-            products={products}
-            categories={categories}
+            products={sortedProducts}
+            categories={sortedCategories}
             counts={countsHistory}
             selectedDate={selectedDate}
             onNavigateToOrders={() => setActiveTab('orders')}
           />
         ) : activeTab === 'orders' ? (
           <OrdersView
-            products={products}
-            categories={categories}
+            products={sortedProducts}
+            categories={sortedCategories}
             suppliers={suppliers}
             counts={countsHistory}
             selectedDate={selectedDate}
@@ -1414,17 +1428,27 @@ export default function App() {
             isOpen={true}
             onClose={() => setActiveTab('orders')}
             suppliers={suppliers}
-            categories={categories}
-            products={products}
+            categories={sortedCategories}
+            products={sortedProducts}
             onSaveSupplier={handleSaveSupplier}
             onDeleteSupplier={handleDeleteSupplier}
             onBatchAssignCategory={handleBatchAssignSupplierCategory}
             onAssignProductsToSupplier={handleAssignProductsToSupplier}
           />
+        ) : activeTab === 'reports' ? (
+          <ReportsView
+            products={sortedProducts}
+            categories={sortedCategories}
+            suppliers={suppliers}
+            counts={countsHistory}
+            selectedDate={selectedDate}
+            users={users}
+            currentUserId={currentUserId}
+          />
         ) : (
           <DashboardView
-            products={products}
-            categories={categories}
+            products={sortedProducts}
+            categories={sortedCategories}
             countsHistory={countsHistory.loja || {}}
             selectedDate={selectedDate}
           />
@@ -1435,8 +1459,8 @@ export default function App() {
       <ProductManagementModal
         isOpen={isProductsModalOpen}
         onClose={() => setIsProductsModalOpen(false)}
-        products={products}
-        categories={categories}
+        products={sortedProducts}
+        categories={sortedCategories}
         suppliers={suppliers}
         onSaveProduct={handleSaveProduct}
         onDeleteProduct={handleDeleteProduct}
@@ -1457,8 +1481,8 @@ export default function App() {
         isOpen={isSuppliersModalOpen}
         onClose={() => setIsSuppliersModalOpen(false)}
         suppliers={suppliers}
-        categories={categories}
-        products={products}
+        categories={sortedCategories}
+        products={sortedProducts}
         onSaveSupplier={handleSaveSupplier}
         onDeleteSupplier={handleDeleteSupplier}
         onBatchAssignCategory={handleBatchAssignSupplierCategory}
@@ -1469,7 +1493,7 @@ export default function App() {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         selectedDate={selectedDate}
-        products={products}
+        products={sortedProducts}
         countData={currentCountData}
         users={users}
       />
@@ -1480,8 +1504,8 @@ export default function App() {
           setIsFirebaseModalOpen(false);
           setIsFirebaseActive(isFirebaseConfigured());
         }}
-        products={products}
-        categories={categories}
+        products={sortedProducts}
+        categories={sortedCategories}
         users={users}
         suppliers={suppliers}
         countsHistory={countsHistory}

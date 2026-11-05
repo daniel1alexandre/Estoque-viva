@@ -94,6 +94,10 @@ export default function DailyCountView({
       if (statusFilter === 'divergence' && !hasDivergence) return false;
 
       return true;
+    }).sort((a, b) => {
+      const catCompare = (a.category || '').localeCompare(b.category || '', 'pt-BR', { sensitivity: 'base' });
+      if (catCompare !== 0) return catCompare;
+      return (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' });
     });
   }, [products, items, selectedCategory, searchTerm, statusFilter]);
 

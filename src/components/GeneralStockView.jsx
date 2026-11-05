@@ -79,6 +79,10 @@ export default function GeneralStockView({
         isDepCritical,
         deficit
       };
+    }).sort((a, b) => {
+      const catCompare = (a.product.category || '').localeCompare(b.product.category || '', 'pt-BR', { sensitivity: 'base' });
+      if (catCompare !== 0) return catCompare;
+      return (a.product.name || '').localeCompare(b.product.name || '', 'pt-BR', { sensitivity: 'base' });
     });
   }, [products, lojaSession, depositoSession]);
 
@@ -516,3 +520,4 @@ export default function GeneralStockView({
     </div>
   );
 }
+

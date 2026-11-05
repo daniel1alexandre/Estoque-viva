@@ -38,11 +38,15 @@ export default function ProductManagementModal({
 
   if (!isOpen) return null;
 
-  // Filter products by search
+  // Filter products by search & sort alphabetically by Category (A-Z) and Product (A-Z)
   const filteredList = products.filter(p => {
     if (!searchTerm.trim()) return true;
     return p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
            p.category.toLowerCase().includes(searchTerm.toLowerCase());
+  }).sort((a, b) => {
+    const c = (a.category || '').localeCompare(b.category || '', 'pt-BR', { sensitivity: 'base' });
+    if (c !== 0) return c;
+    return (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' });
   });
 
   const handleStartInlineEdit = (prod) => {
