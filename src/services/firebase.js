@@ -4,6 +4,7 @@ import {
   doc, 
   getDoc, 
   setDoc, 
+  updateDoc,
   collection, 
   getDocs, 
   deleteDoc, 
@@ -287,6 +288,28 @@ export async function seedDataToFirestore(products, categories, users, counts) {
   } catch (err) {
     console.error('Erro ao popular dados no Firestore:', err);
     throw err;
+  }
+}
+
+// Reset all stock and counts in Firestore to 0
+export async function resetAllStockAndCountsInFirestore() {
+  const db = getDb();
+  if (!db) return;
+  try {
+    // 1. Delete all counts documents
+    const countsCol = collection(db, 'counts');
+    const countsSnap = await getDocs(countsCol);
+    for (const d of countsSnap.docs) {
+      await deleteDoc(d.ref);
+    }
+    // 2. Set currentStock = 0 for all products in Firestore
+    const prodsCol = collection(db, 'products');
+    const prodsSnap = await getDocs(prodsCol);
+    for (const d of prodsSnap.docs) {
+      await updateDoc(d.ref, { currentStock: 0 });
+    }
+  } catch (err) {
+    console.warn('Erro ao zerar dados no Firestore:', err);
   }
 }
 

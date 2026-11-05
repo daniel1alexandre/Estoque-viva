@@ -28,87 +28,9 @@ function getTodayString() {
   return `${year}-${month}-${day}`;
 }
 
-// Generate sample history for a location
+// Clean zeroed history
 function generateLocationHistory(products, users, locationMultiplier = 1) {
-  const history = {};
-  const today = new Date();
-
-  for (let i = 5; i >= 1; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
-
-    const items = {};
-    products.forEach((p, idx) => {
-      // Deposito has more stock than loja
-      const baseStock = Math.round(p.currentStock * locationMultiplier);
-      const entries = idx % 5 === 0 ? 10 * locationMultiplier : 0;
-      const outputCount = (idx % 2 === 0) ? Math.floor(Math.random() * 6) + 1 : Math.floor(Math.random() * 3);
-      const expected = baseStock + entries - outputCount;
-      const diff = idx === 12 ? -1 : (idx === 25 ? 1 : 0);
-      const countedStock = expected + diff;
-
-      items[p.id] = {
-        productId: p.id,
-        currentStock: baseStock,
-        entries: entries,
-        outputCount: outputCount,
-        countedStock: countedStock,
-        difference: diff,
-        checked: true,
-        checkedAt: new Date(d.setHours(17, 30, 0)).toISOString(),
-        countedBy: users[idx % users.length]?.name || 'Conferente',
-        lastModified: new Date().toISOString()
-      };
-    });
-
-    history[dateStr] = {
-      date: dateStr,
-      defaultUserId: users[0]?.id || 'usr-1',
-      items
-    };
-  }
-
-  // Today's count
-  const todayStr = getTodayString();
-  const todayItems = {};
-  products.forEach((p, idx) => {
-    const isDone = idx < 15;
-    // Chain rule: initial stock of today is the counted stock of yesterday
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yestStr = yesterday.toISOString().split('T')[0];
-    const prevCounted = history[yestStr]?.items?.[p.id]?.countedStock;
-    const baseStock = prevCounted !== null && prevCounted !== undefined 
-      ? prevCounted 
-      : Math.round(p.currentStock * locationMultiplier);
-
-    const entries = idx % 6 === 0 ? 12 : 0;
-    const outputCount = isDone ? Math.floor(Math.random() * 5) + 1 : 0;
-    const expected = baseStock + entries - outputCount;
-    const countedStock = isDone ? expected : null;
-
-    todayItems[p.id] = {
-      productId: p.id,
-      currentStock: baseStock,
-      entries: entries,
-      outputCount: outputCount,
-      countedStock: countedStock,
-      difference: 0,
-      checked: isDone,
-      checkedAt: isDone ? new Date().toISOString() : null,
-      countedBy: users[idx % users.length]?.name || 'Conferente',
-      lastModified: new Date().toISOString()
-    };
-  });
-
-  history[todayStr] = {
-    date: todayStr,
-    defaultUserId: users[0]?.id || 'usr-1',
-    items: todayItems
-  };
-
-  return history;
+  return {};
 }
 
 // Find previous day's counted stock for a product
@@ -511,18 +433,26 @@ app.delete('/api/users/:id', (req, res) => {
   res.json({ success: true, message: 'Usuário excluído com sucesso' });
 });
 
+app.post('/api/reset-clean', (req, res) => {
+  const clientId = req.headers['x-client-id'];
+  db.products.forEach(p => { p.currentStock = 0; });
+  db.counts = { loja: {}, deposito: {} };
+  saveDatabase(db, clientId);
+  res.json({ success: true, message: 'Todos os valores de produtos e contagens foram zerados com sucesso!' });
+});
+
 app.post('/api/reset-demo', (req, res) => {
   db = {
     products: initialProducts,
     categories: initialCategories,
     users: initialUsers,
     counts: {
-      loja: generateLocationHistory(initialProducts, initialUsers, 1),
-      deposito: generateLocationHistory(initialProducts, initialUsers, 2.5)
+      loja: {},
+      deposito: {}
     }
   };
   saveDatabase(db);
-  res.json({ success: true, message: 'Dados de demonstração restaurados com sucesso!' });
+  res.json({ success: true, message: 'Valores zerados com sucesso!' });
 });
 
 export default app;

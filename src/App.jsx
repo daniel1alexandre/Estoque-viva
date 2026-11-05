@@ -18,7 +18,8 @@ import {
   saveCategoriesToFirestore,
   saveUserToFirestore,
   deleteUserFromFirestore,
-  subscribeToRealtimeFirestore
+  subscribeToRealtimeFirestore,
+  resetAllStockAndCountsInFirestore
 } from './services/firebase';
 
 const API_BASE = '/api';
@@ -96,6 +97,31 @@ export default function App() {
 
   // Fetch full data on initial mount or reload
   const loadData = useCallback(async () => {
+    // 0. Migração única de zeramento solicitada pelo usuário: zera todos os estoques e contagens
+    const RESET_KEY = 'viva_reset_zeroed_v4';
+    const isFirstReset = localStorage.getItem(RESET_KEY) !== 'true';
+
+    if (isFirstReset) {
+      try {
+        localStorage.setItem(RESET_KEY, 'true');
+        localStorage.removeItem('viva_counts_history');
+        const cachedProds = localStorage.getItem('viva_products');
+        if (cachedProds) {
+          const parsed = JSON.parse(cachedProds);
+          parsed.forEach(p => { p.currentStock = 0; });
+          localStorage.setItem('viva_products', JSON.stringify(parsed));
+          setProducts(parsed);
+        }
+        setCountsHistory({ loja: {}, deposito: {} });
+        fetch(`${API_BASE}/reset-clean`, { 
+          method: 'POST',
+          headers: { 'X-Client-Id': clientIdRef.current }
+        }).catch(() => {});
+      } catch (e) {
+        console.warn('Erro ao zerar dados locais:', e);
+      }
+    }
+
     // 1. Load from localStorage first so user changes never disappear
     try {
       const cachedCounts = localStorage.getItem('viva_counts_history');
@@ -103,8 +129,17 @@ export default function App() {
       const cachedCats = localStorage.getItem('viva_categories');
       const cachedUsers = localStorage.getItem('viva_users');
 
-      if (cachedCounts) setCountsHistory(JSON.parse(cachedCounts));
-      if (cachedProds) setProducts(JSON.parse(cachedProds));
+      if (!isFirstReset && cachedCounts) {
+        setCountsHistory(JSON.parse(cachedCounts));
+      } else if (isFirstReset) {
+        setCountsHistory({ loja: {}, deposito: {} });
+      }
+
+      if (cachedProds) {
+        const parsed = JSON.parse(cachedProds);
+        if (isFirstReset) parsed.forEach(p => { p.currentStock = 0; });
+        setProducts(parsed);
+      }
       if (cachedCats) setCategories(JSON.parse(cachedCats));
       if (cachedUsers) setUsers(JSON.parse(cachedUsers));
     } catch (e) {
@@ -117,13 +152,20 @@ export default function App() {
     if (isFirebaseConfigured()) {
       try {
         initFirebase();
+        if (isFirstReset) {
+          await resetAllStockAndCountsInFirestore();
+        }
         const fbData = await loadDataFromFirestore();
         if (fbData && fbData.products && fbData.products.length > 0) {
-          setProducts(fbData.products);
+          const loadedProds = isFirstReset
+            ? fbData.products.map(p => ({ ...p, currentStock: 0 }))
+            : fbData.products;
+          setProducts(loadedProds);
           setCategories(fbData.categories || []);
           setUsers(fbData.users || []);
+          const initialCounts = isFirstReset ? { loja: {}, deposito: {} } : (fbData.counts || {});
           setCountsHistory(prev => {
-            const merged = mergeCountsHistory(prev, fbData.counts || {});
+            const merged = mergeCountsHistory(prev, initialCounts);
             try {
               localStorage.setItem('viva_counts_history', JSON.stringify(merged));
             } catch (e) {}
@@ -146,12 +188,14 @@ export default function App() {
         const res = await fetch(`${API_BASE}/data`);
         if (!res.ok) throw new Error('Falha ao conectar com servidor');
         const data = await res.json();
-        if (data.products && data.products.length > 0) setProducts(data.products);
+        const prods = data.products || [];
+        if (isFirstReset) prods.forEach(p => { p.currentStock = 0; });
+        if (prods.length > 0) setProducts(prods);
         if (data.categories && data.categories.length > 0) setCategories(data.categories);
         if (data.users && data.users.length > 0) setUsers(data.users);
 
         let normalizedCounts = { loja: {}, deposito: {} };
-        if (data.counts) {
+        if (!isFirstReset && data.counts) {
           if (data.counts.loja || data.counts.deposito) {
             normalizedCounts = {
               loja: data.counts.loja || {},
@@ -910,6 +954,35 @@ export default function App() {
     }
   };
 
+  const handleResetAllValues = async () => {
+    if (!window.confirm('Tem certeza que deseja zerar todos os estoques e contagens de todos os produtos? Todos os cadastros serão mantidos, mas todos os valores serão zerados a partir de agora.')) {
+      return;
+    }
+
+    try {
+      localStorage.removeItem('viva_counts_history');
+      setProducts(prev => {
+        const updated = prev.map(p => ({ ...p, currentStock: 0 }));
+        try { localStorage.setItem('viva_products', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+      setCountsHistory({ loja: {}, deposito: {} });
+
+      await fetch(`${API_BASE}/reset-clean`, {
+        method: 'POST',
+        headers: { 'X-Client-Id': clientIdRef.current }
+      });
+
+      if (isFirebaseConfigured()) {
+        await resetAllStockAndCountsInFirestore();
+      }
+
+      alert('Todos os valores foram zerados com sucesso! As novas informações serão salvas a partir de agora.');
+    } catch (err) {
+      console.error('Erro ao zerar valores:', err);
+    }
+  };
+
   // Stats calculation - Saída é a diferença (o que foi vendido)
   const summaryStats = useMemo(() => {
     const session = countsHistory.loja?.[selectedDate];
@@ -1035,6 +1108,7 @@ export default function App() {
         onDeleteProduct={handleDeleteProduct}
         onAddCategory={handleAddCategory}
         onDeleteCategory={handleDeleteCategory}
+        onResetAllValues={handleResetAllValues}
       />
 
       <UserManagementModal

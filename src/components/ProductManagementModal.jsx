@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Plus, Edit2, Trash2, Package, Layers, Check, Search } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, Package, Layers, Check, Search, RotateCcw } from 'lucide-react';
 
 export default function ProductManagementModal({
   isOpen,
@@ -9,7 +9,8 @@ export default function ProductManagementModal({
   onSaveProduct,
   onDeleteProduct,
   onAddCategory,
-  onDeleteCategory
+  onDeleteCategory,
+  onResetAllValues
 }) {
   const [editingProductId, setEditingProductId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -193,6 +194,18 @@ export default function ProductManagementModal({
                 >
                   <Plus className="w-3.5 h-3.5 text-slate-500" />
                   Nova Categoria
+                </button>
+              )}
+
+              {onResetAllValues && (
+                <button
+                  type="button"
+                  onClick={onResetAllValues}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 rounded-lg transition shadow-2xs cursor-pointer"
+                  title="Zerar todos os valores de estoques e contagens de todos os produtos"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                  Zerar Valores
                 </button>
               )}
             </div>
