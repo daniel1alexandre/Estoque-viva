@@ -288,6 +288,7 @@ app.get('/api/counts/:date', (req, res) => {
         checked: false,
         checkedAt: null,
         countedBy: db.users[0]?.name || 'Conferente',
+        observation: '',
         lastModified: new Date().toISOString()
       };
     });
@@ -306,7 +307,7 @@ app.get('/api/counts/:date', (req, res) => {
 
 // Auto-save item count
 app.post('/api/counts/save-item', (req, res) => {
-  const { date, productId, currentStock, entries, outputCount, countedStock, checked, countedBy, location = 'loja' } = req.body;
+  const { date, productId, currentStock, entries, outputCount, countedStock, checked, countedBy, observation, location = 'loja' } = req.body;
   const loc = location === 'deposito' ? 'deposito' : 'loja';
 
   if (!date || !productId) {
@@ -351,6 +352,7 @@ app.post('/api/counts/save-item', (req, res) => {
     checked: isChecked,
     checkedAt: isChecked ? (prevItem.checkedAt || new Date().toISOString()) : null,
     countedBy: countedBy || prevItem.countedBy || db.users[0]?.name || 'Conferente',
+    observation: observation !== undefined ? observation : (prevItem.observation || ''),
     lastModified: new Date().toISOString()
   };
 
@@ -468,6 +470,14 @@ app.post('/api/categories', (req, res) => {
     return res.status(400).json({ error: 'Categoria inválida ou já existente' });
   }
   db.categories.push(name.trim());
+  saveDatabase(db, clientId);
+  res.json({ success: true, categories: db.categories });
+});
+
+app.delete('/api/categories/:name', (req, res) => {
+  const catName = decodeURIComponent(req.params.name);
+  const clientId = req.headers['x-client-id'];
+  db.categories = db.categories.filter(c => c !== catName);
   saveDatabase(db, clientId);
   res.json({ success: true, categories: db.categories });
 });

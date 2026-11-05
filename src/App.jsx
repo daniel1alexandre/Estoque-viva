@@ -822,6 +822,25 @@ export default function App() {
     }
   };
 
+  const handleDeleteCategory = async (catName) => {
+    const updated = categories.filter(c => c !== catName);
+    setCategories(updated);
+    try { localStorage.setItem('viva_categories', JSON.stringify(updated)); } catch (e) {}
+
+    try {
+      await fetch(`${API_BASE}/categories/${encodeURIComponent(catName)}`, {
+        method: 'DELETE',
+        headers: { 'X-Client-Id': clientIdRef.current }
+      });
+    } catch (err) {
+      console.error('Erro ao excluir categoria no backend:', err);
+    }
+
+    if (isFirebaseConfigured()) {
+      saveCategoriesToFirestore(updated);
+    }
+  };
+
   const handleAddUser = async (userData) => {
     const tempUser = { id: 'usr-' + Date.now(), name: userData.name };
     setUsers(prev => {
@@ -884,7 +903,7 @@ export default function App() {
     }
   };
 
-  // Stats calculation - Saída é a diferença entre as contagens
+  // Stats calculation - Saída é a diferença (o que foi vendido)
   const summaryStats = useMemo(() => {
     const session = countsHistory.loja?.[selectedDate];
     let checkedCount = 0;
@@ -893,16 +912,8 @@ export default function App() {
     if (session && session.items) {
       Object.values(session.items).forEach(it => {
         if (it.checked) checkedCount++;
-        const hasCount = it.countedStock !== null && it.countedStock !== undefined && it.countedStock !== '';
-        const hasTarde = it.outputCount !== null && it.outputCount !== undefined && it.outputCount !== '' && Number(it.outputCount) > 0;
-        let saida = 0;
-        if (hasCount && hasTarde) {
-          saida = Math.abs(Number(it.outputCount) - Number(it.countedStock));
-        } else if (hasCount && !hasTarde) {
-          const inicial = (Number(it.currentStock) || 0) + (Number(it.entries) || 0);
-          const final = Number(it.countedStock) || 0;
-          saida = Math.max(0, inicial - final);
-        }
+        // No dashboard/resumo de saída, considerar apenas a diferença como o que foi vendido
+        const saida = Math.abs(Number(it.difference) || 0);
         totalOutputToday += saida;
       });
     }
@@ -922,16 +933,7 @@ export default function App() {
     if (session && session.items) {
       Object.values(session.items).forEach(it => {
         if (it.checked) checkedCount++;
-        const hasCount = it.countedStock !== null && it.countedStock !== undefined && it.countedStock !== '';
-        const hasTarde = it.outputCount !== null && it.outputCount !== undefined && it.outputCount !== '' && Number(it.outputCount) > 0;
-        let saida = 0;
-        if (hasCount && hasTarde) {
-          saida = Math.abs(Number(it.outputCount) - Number(it.countedStock));
-        } else if (hasCount && !hasTarde) {
-          const inicial = (Number(it.currentStock) || 0) + (Number(it.entries) || 0);
-          const final = Number(it.countedStock) || 0;
-          saida = Math.max(0, inicial - final);
-        }
+        const saida = Math.abs(Number(it.difference) || 0);
         totalOutputToday += saida;
       });
     }
@@ -1025,6 +1027,7 @@ export default function App() {
         onSaveProduct={handleSaveProduct}
         onDeleteProduct={handleDeleteProduct}
         onAddCategory={handleAddCategory}
+        onDeleteCategory={handleDeleteCategory}
       />
 
       <UserManagementModal

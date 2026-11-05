@@ -16,7 +16,8 @@ import {
   SunMedium, 
   UserCheck,
   Edit2,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react';
 
 export default function DailyCountView({
@@ -41,6 +42,23 @@ export default function DailyCountView({
   const [inlineName, setInlineName] = useState('');
   const [inlineCategory, setInlineCategory] = useState('');
   const [inlineUnit, setInlineUnit] = useState('');
+
+  // Inline Estoque Inicial adjustment
+  const [editingStockProdId, setEditingStockProdId] = useState(null);
+  const [adjustedStockValue, setAdjustedStockValue] = useState('');
+
+  const handleStartStockAdjustment = (prodId, currentVal) => {
+    setEditingStockProdId(prodId);
+    setAdjustedStockValue(String(currentVal));
+  };
+
+  const handleSaveStockAdjustment = (prodId) => {
+    const num = Number(adjustedStockValue);
+    if (!isNaN(num) && num >= 0) {
+      onUpdateItem(prodId, { currentStock: num });
+    }
+    setEditingStockProdId(null);
+  };
 
   // Current session items dictionary
   const items = countData?.items || {};
@@ -94,17 +112,8 @@ export default function DailyCountView({
         totalEntries += Number(it.entries) || 0;
         totalTarde += Number(it.outputCount) || 0;
 
-        // Saída de produtos é calculada pela diferença entre as contagens
-        const hasCount = it.countedStock !== null && it.countedStock !== undefined && it.countedStock !== '';
-        const hasTarde = it.outputCount !== null && it.outputCount !== undefined && it.outputCount !== '' && Number(it.outputCount) > 0;
-        let saida = 0;
-        if (hasCount && hasTarde) {
-          saida = Math.abs(Number(it.outputCount) - Number(it.countedStock));
-        } else if (hasCount && !hasTarde) {
-          const inicial = (Number(it.currentStock) || 0) + (Number(it.entries) || 0);
-          const final = Number(it.countedStock) || 0;
-          saida = Math.max(0, inicial - final);
-        }
+        // Saída de produtos é considerada apenas a diferença (o que foi vendido)
+        const saida = Math.abs(Number(it.difference) || 0);
         totalSaidas += saida;
       }
     });
@@ -146,7 +155,9 @@ export default function DailyCountView({
               {isDeposito ? 'Controle de Estoque - Depósito Central' : 'Controle de Estoque - Loja / Frente'}
             </h2>
             <p className="text-xs opacity-80">
-              Conferente responsável: <strong>{currentUser?.name}</strong> • Estoque Final = (Inicial + Entrada) - Última Contagem
+              {isDeposito 
+                ? <>Conferente responsável: <strong>{currentUser?.name}</strong> • Contagem física, Entradas, Ajuste de Estoque e Observações</>
+                : <>Conferente responsável: <strong>{currentUser?.name}</strong> • Estoque Final = Última Contagem | Diferença = Última Contagem - Contagem da Tarde</>}
             </p>
           </div>
         </div>
@@ -159,7 +170,7 @@ export default function DailyCountView({
       </div>
 
       {/* Top metrics summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className={`grid grid-cols-2 ${isDeposito ? 'md:grid-cols-4' : 'md:grid-cols-5'} gap-3`}>
         <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 mb-1">
             <span className="text-xs font-semibold">Total de Itens</span>
@@ -221,19 +232,21 @@ export default function DailyCountView({
           </div>
         </div>
 
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between col-span-2 md:col-span-1">
-          <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-xs font-semibold">Contagem da Tarde</span>
-            <SunMedium className="w-4 h-4 text-amber-500" />
+        {!isDeposito && (
+          <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between col-span-2 md:col-span-1">
+            <div className="flex items-center justify-between text-slate-500 mb-1">
+              <span className="text-xs font-semibold">Contagem da Tarde</span>
+              <SunMedium className="w-4 h-4 text-amber-500" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-amber-600">{stats.totalTarde}</span>
+              <span className="text-xs text-slate-500">unidades</span>
+            </div>
+            <div className="mt-1.5 text-[11px] text-amber-600 font-medium">
+              Contagem intermediária da tarde
+            </div>
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-amber-600">{stats.totalTarde}</span>
-            <span className="text-xs text-slate-500">unidades</span>
-          </div>
-          <div className="mt-1.5 text-[11px] text-amber-600 font-medium">
-            Contagem intermediária da tarde
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Filter and Search toolbar */}
@@ -367,66 +380,38 @@ export default function DailyCountView({
       {/* Main Count Table - Reordered Columns & Styled as requested */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden w-full">
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-left text-sm border-collapse min-w-[1100px]">
+          <table className="w-full text-left text-sm border-collapse min-w-[950px]">
             <thead>
-              <tr className="bg-slate-50/90 text-slate-700 font-semibold text-xs border-b border-slate-200">
-                {/* 1. Categoria */}
-                <th className="py-3 px-3 text-left w-36">
-                  Categoria
-                </th>
-
-                {/* 2. Item / Produto */}
-                <th className="py-3 px-3 min-w-[260px]">
-                  Item / Produto
-                </th>
-
-                {/* 3. Estoque Inicial */}
-                <th className="py-3 px-2 text-center w-24">
-                  Estoque Inicial
-                </th>
-
-                {/* 4. Entradas (+) */}
-                <th className="py-3 px-2 text-center w-28 bg-emerald-50/50 text-emerald-950 border-x border-emerald-100">
-                  Entradas (+)
-                </th>
-
-                {/* 5. Contagem da Tarde - Same color and structure as Última Contagem */}
-                <th className="py-3 px-2 text-center w-36 bg-amber-50/60 text-amber-950 font-bold border-r border-amber-200">
-                  Contagem da Tarde
-                </th>
-
-                {/* 6. Última Contagem */}
-                <th className="py-3 px-2 text-center w-36 bg-amber-50/60 text-amber-950 font-bold border-r border-amber-200">
-                  Última Contagem
-                </th>
-
-                {/* 7. Estoque Final (fórmula: (Inicial + Entrada) - Última Contagem) */}
-                {/* 7. Estoque Final (fórmula: Última Contagem) */}
-                <th className="py-3 px-2 text-center w-32 font-bold text-slate-900 bg-slate-100/70 border-r border-slate-200">
-                  Estoque Final
-                </th>
-
-                {/* 8. Diferença (fórmula: Última Contagem - Contagem da Tarde - Entrada) */}
-                {/* 8. Diferença (fórmula: Última Contagem - Contagem da Tarde) */}
-                <th className="py-3 px-2 text-center w-32">
-                  Diferença
-                </th>
-
-                {/* 9. Check */}
-                <th className="py-3 px-2 text-center w-20 bg-slate-50/50 border-x border-slate-200">
-                  Check
-                </th>
-
-                {/* 10. Conferente / Horário (Sem permissão de troca individual na linha) */}
-                <th className="py-3 px-4 min-w-[180px]">
-                  Conferente / Horário
-                </th>
-              </tr>
+              {isDeposito ? (
+                /* DEPÓSITO TABLE HEADER: Apenas Categoria, Produto, Ajuste de Estoque, Entradas, Contagem de Estoque e Observações */
+                <tr className="bg-slate-50/90 text-slate-700 font-semibold text-xs border-b border-slate-200">
+                  <th className="py-3 px-3 text-left w-36">Categoria</th>
+                  <th className="py-3 px-3 min-w-[280px]">Item / Produto</th>
+                  <th className="py-3 px-2 text-center w-36">Ajuste de Estoque</th>
+                  <th className="py-3 px-2 text-center w-32 bg-emerald-50/50 text-emerald-950 border-x border-emerald-100">Entradas (+)</th>
+                  <th className="py-3 px-2 text-center w-40 bg-amber-50/60 text-amber-950 font-bold border-r border-amber-200">Contagem de Estoque</th>
+                  <th className="py-3 px-3 min-w-[240px]">Observações</th>
+                </tr>
+              ) : (
+                /* LOJA TABLE HEADER: Completo com Contagem da Tarde, Última Contagem, Estoque Final, Diferença, Check e Observação */
+                <tr className="bg-slate-50/90 text-slate-700 font-semibold text-xs border-b border-slate-200">
+                  <th className="py-3 px-3 text-left w-32">Categoria</th>
+                  <th className="py-3 px-3 min-w-[220px]">Item / Produto</th>
+                  <th className="py-3 px-2 text-center w-28">Estoque Inicial</th>
+                  <th className="py-3 px-2 text-center w-24 bg-emerald-50/50 text-emerald-950 border-x border-emerald-100">Entradas (+)</th>
+                  <th className="py-3 px-2 text-center w-32 bg-amber-50/60 text-amber-950 font-bold border-r border-amber-200">Contagem da Tarde</th>
+                  <th className="py-3 px-2 text-center w-32 bg-amber-50/60 text-amber-950 font-bold border-r border-amber-200">Última Contagem</th>
+                  <th className="py-3 px-2 text-center w-28 font-bold text-slate-900 bg-slate-100/70 border-r border-slate-200">Estoque Final</th>
+                  <th className="py-3 px-2 text-center w-28">Diferença</th>
+                  <th className="py-3 px-2 text-center w-20 bg-slate-50/50 border-x border-slate-200">Check</th>
+                  <th className="py-3 px-3 min-w-[220px]">Observação</th>
+                </tr>
+              )}
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-400">
+                  <td colSpan={isDeposito ? 6 : 10} className="py-12 text-center text-slate-400">
                     <Package className="w-10 h-10 mx-auto text-slate-300 mb-2" />
                     <p className="font-medium text-slate-600">Nenhum produto encontrado</p>
                     <p className="text-xs text-slate-400 mt-1">
@@ -444,7 +429,8 @@ export default function DailyCountView({
                     countedStock: null,
                     difference: 0,
                     checked: false,
-                    countedBy: currentUser.name
+                    countedBy: currentUser.name,
+                    observation: ''
                   };
 
                   const currentStock = Number(item.currentStock ?? product.currentStock) || 0;
@@ -549,9 +535,52 @@ export default function DailyCountView({
                         )}
                       </td>
 
-                      {/* 3. Estoque Inicial */}
+                      {/* 3. Estoque Inicial / Ajuste de Estoque com ícone de editar */}
                       <td className="py-2.5 px-2 text-center font-semibold text-slate-800">
-                        {currentStock}
+                        {editingStockProdId === product.id ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              value={adjustedStockValue}
+                              onChange={(e) => setAdjustedStockValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveStockAdjustment(product.id);
+                                if (e.key === 'Escape') setEditingStockProdId(null);
+                              }}
+                              autoFocus
+                              className="w-16 text-center font-bold text-blue-700 bg-white border border-blue-400 rounded px-1 py-0.5 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleSaveStockAdjustment(product.id)}
+                              className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
+                              title="Salvar ajuste"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingStockProdId(null)}
+                              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded cursor-pointer"
+                              title="Cancelar"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1 group">
+                            <span className="font-bold text-slate-800">{currentStock}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleStartStockAdjustment(product.id, currentStock)}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer"
+                              title="Ajustar estoque inicial"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                       </td>
 
                       {/* 4. Entradas (+) */}
@@ -569,110 +598,157 @@ export default function DailyCountView({
                         />
                       </td>
 
-                      {/* 5. Contagem da Tarde - SAME COLOR AND STRUCTURE AS ÚLTIMA CONTAGEM */}
-                      <td className="py-2.5 px-2 text-center bg-amber-50/30 border-r border-amber-200/60">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.outputCount === 0 || item.outputCount === null || item.outputCount === undefined ? '' : item.outputCount}
-                          placeholder="Digitar..."
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? 0 : Number(e.target.value);
-                            onUpdateItem(product.id, { outputCount: val });
-                          }}
-                          className={`w-24 mx-auto text-center font-bold text-base rounded-lg py-1.5 px-2 border focus:outline-none focus:ring-2 transition shadow-xs ${
-                            hasTarde
-                              ? 'bg-white border-amber-400 text-slate-900 ring-1 ring-amber-300'
-                              : 'bg-white border-slate-300 text-slate-500 hover:border-amber-400'
-                          }`}
-                        />
-                      </td>
+                      {/* --- DEPÓSITO COLUNAS EXCLUSIVAS (Apenas Contagem e Observação) --- */}
+                      {isDeposito ? (
+                        <>
+                          {/* 5. Contagem de Estoque (Depósito) */}
+                          <td className="py-2.5 px-2 text-center bg-amber-50/30 border-r border-amber-200/60">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.countedStock === null || item.countedStock === undefined ? '' : item.countedStock}
+                              placeholder="Digitar..."
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? null : Number(e.target.value);
+                                onUpdateItem(product.id, { 
+                                  countedStock: val,
+                                  countedBy: currentUser.name
+                                });
+                              }}
+                              className={`w-28 mx-auto text-center font-bold text-base rounded-lg py-1.5 px-2 border focus:outline-none focus:ring-2 transition shadow-xs ${
+                                hasCount
+                                  ? 'bg-white border-amber-400 text-slate-900 ring-1 ring-amber-300'
+                                  : 'bg-white border-slate-300 text-slate-500 hover:border-amber-400'
+                              }`}
+                            />
+                          </td>
 
-                      {/* 6. Última Contagem */}
-                      <td className="py-2.5 px-2 text-center bg-amber-50/30 border-r border-amber-200/60">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.countedStock === null || item.countedStock === undefined ? '' : item.countedStock}
-                          placeholder="Digitar..."
-                          onChange={(e) => {
-                            const val = e.target.value === '' ? null : Number(e.target.value);
-                            onUpdateItem(product.id, { 
-                              countedStock: val,
-                              countedBy: currentUser.name
-                            });
-                          }}
-                          className={`w-24 mx-auto text-center font-bold text-base rounded-lg py-1.5 px-2 border focus:outline-none focus:ring-2 transition shadow-xs ${
-                            hasCount
-                              ? 'bg-white border-amber-400 text-slate-900 ring-1 ring-amber-300'
-                              : 'bg-white border-slate-300 text-slate-500 hover:border-amber-400'
-                          }`}
-                        />
-                      </td>
+                          {/* 6. Observações (Depósito) */}
+                          <td className="py-2.5 px-3">
+                            <input
+                              type="text"
+                              value={item.observation || ''}
+                              placeholder="Observação do depósito..."
+                              onChange={(e) => {
+                                onUpdateItem(product.id, { observation: e.target.value });
+                              }}
+                              className="w-full text-xs border border-slate-200 rounded-md py-1.5 px-2.5 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                            />
+                          </td>
+                        </>
+                      ) : (
+                        /* --- LOJA COLUNAS COMPLETAS --- */
+                        <>
+                          {/* 5. Contagem da Tarde */}
+                          <td className="py-2.5 px-2 text-center bg-amber-50/30 border-r border-amber-200/60">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.outputCount === 0 || item.outputCount === null || item.outputCount === undefined ? '' : item.outputCount}
+                              placeholder="Digitar..."
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                onUpdateItem(product.id, { outputCount: val });
+                              }}
+                              className={`w-24 mx-auto text-center font-bold text-base rounded-lg py-1.5 px-2 border focus:outline-none focus:ring-2 transition shadow-xs ${
+                                hasTarde
+                                  ? 'bg-white border-amber-400 text-slate-900 ring-1 ring-amber-300'
+                                  : 'bg-white border-slate-300 text-slate-500 hover:border-amber-400'
+                              }`}
+                            />
+                          </td>
 
-                      {/* 7. Estoque Final = (Inicial + Entrada) - Última Contagem */}
-                      <td className="py-2.5 px-2 text-center font-bold bg-slate-100/50 border-r border-slate-200">
-                        <span className="inline-block bg-slate-200/80 text-slate-900 px-2.5 py-1 rounded-md text-xs font-mono font-bold">
-                          {estoqueFinal}
-                        </span>
-                      </td>
+                          {/* 6. Última Contagem */}
+                          <td className="py-2.5 px-2 text-center bg-amber-50/30 border-r border-amber-200/60">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.countedStock === null || item.countedStock === undefined ? '' : item.countedStock}
+                              placeholder="Digitar..."
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? null : Number(e.target.value);
+                                onUpdateItem(product.id, { 
+                                  countedStock: val,
+                                  countedBy: currentUser.name
+                                });
+                              }}
+                              className={`w-24 mx-auto text-center font-bold text-base rounded-lg py-1.5 px-2 border focus:outline-none focus:ring-2 transition shadow-xs ${
+                                hasCount
+                                  ? 'bg-white border-amber-400 text-slate-900 ring-1 ring-amber-300'
+                                  : 'bg-white border-slate-300 text-slate-500 hover:border-amber-400'
+                              }`}
+                            />
+                          </td>
 
-                      {/* 8. Diferença = Última Contagem - Contagem da Tarde - Entrada */}
-                      <td className="py-2.5 px-2 text-center">
-                        {!hasCount ? (
-                          <span className="text-xs text-slate-400 font-medium italic">
-                            Não contado
-                          </span>
-                        ) : diff === 0 ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-md">
-                            <Check className="w-3.5 h-3.5" />
-                            0 (OK)
-                          </span>
-                        ) : diff > 0 ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-100 border border-blue-300 px-2 py-0.5 rounded-md">
-                            <TrendingUp className="w-3.5 h-3.5" />
-                            +{diff} (Sobra)
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-md animate-pulse-subtle">
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            {diff} (Falta)
-                          </span>
-                        )}
-                      </td>
+                          {/* 7. Estoque Final */}
+                          <td className="py-2.5 px-2 text-center font-bold bg-slate-100/50 border-r border-slate-200">
+                            <span className="inline-block bg-slate-200/80 text-slate-900 px-2.5 py-1 rounded-md text-xs font-mono font-bold">
+                              {estoqueFinal}
+                            </span>
+                          </td>
 
-                      {/* 9. Check Button */}
-                      <td className="py-2.5 px-2 text-center bg-slate-50/40 border-x border-slate-200/80">
-                        <button
-                          type="button"
-                          onClick={() => onToggleCheck(product.id, !isChecked)}
-                          className={`w-8 h-8 rounded-lg mx-auto flex items-center justify-center transition-all cursor-pointer ${
-                            isChecked
-                              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30 scale-105 hover:bg-emerald-700'
-                              : 'bg-white border-2 border-slate-300 text-transparent hover:border-emerald-500 hover:text-emerald-500/50'
-                          }`}
-                          title={isChecked ? 'Item Conferido! Clique para desmarcar' : 'Clique para marcar como Conferido'}
-                        >
-                          <Check className="w-5 h-5 stroke-[2.5]" />
-                        </button>
-                      </td>
+                          {/* 8. Diferença */}
+                          <td className="py-2.5 px-2 text-center">
+                            {!hasCount ? (
+                              <span className="text-xs text-slate-400 font-medium italic">
+                                Não contado
+                              </span>
+                            ) : diff === 0 ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-md">
+                                <Check className="w-3.5 h-3.5" />
+                                0 (OK)
+                              </span>
+                            ) : diff > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 bg-blue-100 border border-blue-300 px-2 py-0.5 rounded-md">
+                                <TrendingUp className="w-3.5 h-3.5" />
+                                +{diff} (Sobra)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-md animate-pulse-subtle">
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                {diff} (Falta)
+                              </span>
+                            )}
+                          </td>
 
-                      {/* 10. Conferente / Horário (Fixo no conferente selecionado no cabeçalho - sem troca na linha) */}
-                      <td className="py-2.5 px-4">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-blue-600 inline-block shrink-0" />
-                            {currentUser.name}
-                          </span>
-                          
-                          {isChecked && item.checkedAt && (
-                            <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
-                              <Clock className="w-3 h-3 text-emerald-600" />
-                              <span>Conferido às {new Date(item.checkedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                          {/* 9. Check Button */}
+                          <td className="py-2.5 px-2 text-center bg-slate-50/40 border-x border-slate-200/80">
+                            <button
+                              type="button"
+                              onClick={() => onToggleCheck(product.id, !isChecked)}
+                              className={`w-8 h-8 rounded-lg mx-auto flex items-center justify-center transition-all cursor-pointer ${
+                                isChecked
+                                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/30 scale-105 hover:bg-emerald-700'
+                                  : 'bg-white border-2 border-slate-300 text-transparent hover:border-emerald-500 hover:text-emerald-500/50'
+                              }`}
+                              title={isChecked ? 'Item Conferido! Clique para desmarcar' : 'Clique para marcar como Conferido'}
+                            >
+                              <Check className="w-5 h-5 stroke-[2.5]" />
+                            </button>
+                          </td>
+
+                          {/* 10. Observação (Permite digitar informação diretamente) */}
+                          <td className="py-2.5 px-3">
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                value={item.observation || ''}
+                                placeholder="Adicionar observação..."
+                                onChange={(e) => {
+                                  onUpdateItem(product.id, { observation: e.target.value });
+                                }}
+                                className="w-full text-xs border border-slate-200 rounded-md py-1.5 px-2.5 bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                              />
+                              {isChecked && item.checkedAt && (
+                                <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                                  <Clock className="w-3 h-3 text-emerald-600 shrink-0" />
+                                  <span>Conferido por {currentUser.name} às {new Date(item.checkedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      </td>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   );
                 })
@@ -683,17 +759,34 @@ export default function DailyCountView({
 
         {/* Footer info in table */}
         <div className="bg-slate-50/80 px-4 py-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-          <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 text-blue-500" />
-            <span>
-              <strong>Fórmulas:</strong> Estoque Final = Última Contagem | Diferença = Última Contagem - Contagem da Tarde.
-            </span>
-          </div>
-          <div className="flex items-center gap-4 font-semibold text-slate-700">
-            <span>Total Entradas: <strong className="text-emerald-700 font-bold">+{stats.totalEntries}</strong></span>
-            <span>Total Contagem da Tarde: <strong className="text-amber-700 font-bold">{stats.totalTarde}</strong></span>
-            <span>Total Saídas: <strong className="text-blue-700 font-bold">{stats.totalSaidas}</strong></span>
-          </div>
+          {isDeposito ? (
+            <>
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-amber-600" />
+                <span>
+                  <strong>Depósito Central:</strong> Contagem física de estoque, entradas de mercadorias, ajustes de estoque e observações.
+                </span>
+              </div>
+              <div className="flex items-center gap-4 font-semibold text-slate-700">
+                <span>Total Entradas: <strong className="text-emerald-700 font-bold">+{stats.totalEntries}</strong></span>
+                <span>Itens Conferidos: <strong className="text-emerald-700 font-bold">{stats.checkedCount} / {stats.totalItems}</strong></span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-blue-500" />
+                <span>
+                  <strong>Fórmulas:</strong> Estoque Final = Última Contagem | Diferença = Última Contagem - Contagem da Tarde.
+                </span>
+              </div>
+              <div className="flex items-center gap-4 font-semibold text-slate-700">
+                <span>Total Entradas: <strong className="text-emerald-700 font-bold">+{stats.totalEntries}</strong></span>
+                <span>Total Contagem da Tarde: <strong className="text-amber-700 font-bold">{stats.totalTarde}</strong></span>
+                <span>Total Saídas (Vendido): <strong className="text-blue-700 font-bold">{stats.totalSaidas}</strong></span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

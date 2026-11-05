@@ -8,12 +8,14 @@ export default function ProductManagementModal({
   categories,
   onSaveProduct,
   onDeleteProduct,
-  onAddCategory
+  onAddCategory,
+  onDeleteCategory
 }) {
   const [editingProductId, setEditingProductId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [newCatName, setNewCatName] = useState('');
   const [showCatInput, setShowCatInput] = useState(false);
+  const [showCatManager, setShowCatManager] = useState(false);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   // New product form fields (only for adding new)
@@ -136,13 +138,27 @@ export default function ProductManagementModal({
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={handleStartCreate}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 Novo Produto
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowCatManager(prev => !prev)}
+                className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg border transition cursor-pointer ${
+                  showCatManager
+                    ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                    : 'text-slate-700 bg-white border-slate-200 hover:bg-slate-100'
+                }`}
+                title="Exibir e gerenciar/excluir categorias existentes"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Categorias ({categories.length})
               </button>
 
               {showCatInput ? (
@@ -175,12 +191,61 @@ export default function ProductManagementModal({
                   onClick={() => setShowCatInput(true)}
                   className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                 >
-                  <Layers className="w-3.5 h-3.5 text-slate-500" />
+                  <Plus className="w-3.5 h-3.5 text-slate-500" />
                   Nova Categoria
                 </button>
               )}
             </div>
           </div>
+
+          {/* Category Management Drawer */}
+          {showCatManager && (
+            <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200 space-y-2 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-amber-600" />
+                  Categorias Cadastradas — Clique na lixeira para excluir uma categoria
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowCatManager(false)}
+                  className="text-xs text-amber-800 hover:text-amber-950 font-medium cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                {categories.map(cat => {
+                  const prodsInCat = products.filter(p => p.category === cat).length;
+                  return (
+                    <div
+                      key={cat}
+                      className="inline-flex items-center gap-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 shadow-2xs"
+                    >
+                      <span className="font-semibold">{cat}</span>
+                      <span className="text-[10px] text-slate-400 font-normal">({prodsInCat} itens)</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const msg = prodsInCat > 0
+                            ? `Atenção: Existem ${prodsInCat} produto(s) vinculados à categoria "${cat}". Tem certeza que deseja excluir esta categoria?`
+                            : `Deseja realmente excluir a categoria "${cat}"?`;
+                          if (window.confirm(msg)) {
+                            if (onDeleteCategory) onDeleteCategory(cat);
+                          }
+                        }}
+                        className="ml-1 p-0.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                        title={`Excluir categoria "${cat}"`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Form to create a NEW product */}
           {isCreatingNew && (
