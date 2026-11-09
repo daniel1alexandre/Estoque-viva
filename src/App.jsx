@@ -94,6 +94,22 @@ export default function App() {
   // Sidebar Layout States
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const sidebarNavRef = useRef(null);
+
+  // Auto-scroll no Menu Lateral quando os itens na tela principal à direita forem rolados para baixo
+  const handleMainScroll = (e) => {
+    if (sidebarNavRef.current) {
+      const main = e.currentTarget;
+      const maxMainScroll = main.scrollHeight - main.clientHeight;
+      if (maxMainScroll > 0) {
+        const scrollRatio = main.scrollTop / maxMainScroll;
+        const maxSidebarScroll = sidebarNavRef.current.scrollHeight - sidebarNavRef.current.clientHeight;
+        if (maxSidebarScroll > 0) {
+          sidebarNavRef.current.scrollTop = scrollRatio * maxSidebarScroll;
+        }
+      }
+    }
+  };
 
   // Modals
   const [isProductsModalOpen, setIsProductsModalOpen] = useState(false);
@@ -1315,7 +1331,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-50 w-full overflow-x-hidden">
+    <div className="h-screen w-screen flex overflow-hidden bg-slate-50">
       {/* Menu Lateral (Sidebar) com todos os menus reunidos na lateral */}
       <Sidebar
         activeTab={activeTab}
@@ -1338,10 +1354,11 @@ export default function App() {
         setIsCollapsed={setIsSidebarCollapsed}
         isMobileOpen={isMobileSidebarOpen}
         setIsMobileOpen={setIsMobileSidebarOpen}
+        navRef={sidebarNavRef}
       />
 
       {/* Conteúdo Principal com Barra Superior Limpa */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
         <TopNavbar
           activeTab={activeTab}
           selectedDate={selectedDate}
@@ -1352,8 +1369,11 @@ export default function App() {
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
         />
 
-        {/* Main container: Full Width utilizing all left and right margins */}
-        <main className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-4 md:px-6 py-4">
+        {/* Main container: Full Width utilizing all left and right margins, auto-scrolling sidebar menu in sync */}
+        <main 
+          onScroll={handleMainScroll}
+          className="flex-1 overflow-y-auto w-full max-w-[1920px] mx-auto px-2 sm:px-4 md:px-6 py-4 scroll-smooth"
+        >
         {activeTab === 'count' ? (
           <DailyCountView
             key={`loja-${selectedDate}`}
