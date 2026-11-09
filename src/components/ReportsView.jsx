@@ -356,6 +356,241 @@ export default function ReportsView({
     };
   }, [compiledRows]);
 
+  // Generate XML Spreadsheet (SpreadsheetML) content for .xlm and .xml
+  const generateXmlSpreadsheet = () => {
+    const escapeXml = (unsafe) => {
+      if (unsafe === null || unsafe === undefined) return '';
+      return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    };
+
+    const activeCols = [];
+    if (columns.category) activeCols.push({ key: 'category', label: 'Categoria', type: 'String', width: 140 });
+    if (columns.code) activeCols.push({ key: 'code', label: 'Código', type: 'String', width: 90 });
+    if (columns.name) activeCols.push({ key: 'name', label: 'Produto', type: 'String', width: 220 });
+    if (columns.unit) activeCols.push({ key: 'unit', label: 'Unidade', type: 'String', width: 60 });
+    if (columns.supplier) activeCols.push({ key: 'supplierName', label: 'Fornecedor', type: 'String', width: 160 });
+    if (columns.initialStock) activeCols.push({ key: 'initialStock', label: 'Estoque Inicial', type: 'Number', width: 90 });
+    if (columns.entries) activeCols.push({ key: 'entries', label: 'Entradas (+)', type: 'Number', width: 90 });
+    if (columns.outputCount) activeCols.push({ key: 'outputCount', label: 'Contagem Tarde', type: 'Number', width: 100 });
+    if (columns.countedStock) activeCols.push({ key: 'countedStock', label: 'Última Contagem', type: 'Number', width: 100 });
+    if (columns.estoqueLoja) activeCols.push({ key: 'estoqueLoja', label: 'Estoque Loja', type: 'Number', width: 90 });
+    if (columns.estoqueDeposito) activeCols.push({ key: 'estoqueDeposito', label: 'Estoque Depósito', type: 'Number', width: 100 });
+    if (columns.estoqueGeral) activeCols.push({ key: 'estoqueGeral', label: 'Estoque Geral Total', type: 'Number', width: 120 });
+    if (columns.saidas) activeCols.push({ key: 'saidas', label: 'Saídas (Vendas)', type: 'Number', width: 100 });
+    if (columns.minStock) activeCols.push({ key: 'minStock', label: 'Estoque Mínimo', type: 'Number', width: 90 });
+    if (columns.difference) activeCols.push({ key: 'difference', label: 'Diferença', type: 'Number', width: 80 });
+    if (columns.checked) activeCols.push({ key: 'checked', label: 'Conferido', type: 'String', width: 80 });
+    if (columns.observation) activeCols.push({ key: 'observation', label: 'Observação', type: 'String', width: 200 });
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+  <Title>Relatório de Estoque - Arena Viva</Title>
+  <Author>${escapeXml(currentUser?.name || 'Arena Viva')}</Author>
+  <Created>${new Date().toISOString()}</Created>
+ </DocumentProperties>
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Color="#1E293B"/>
+  </Style>
+  <Style ss:ID="TitleStyle">
+   <Font ss:FontName="Segoe UI" ss:Size="14" ss:Bold="1" ss:Color="#0F172A"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+  </Style>
+  <Style ss:ID="MetaStyle">
+   <Font ss:FontName="Segoe UI" ss:Size="9" ss:Italic="1" ss:Color="#64748B"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+  </Style>
+  <Style ss:ID="HeaderStyle">
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#4338CA" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#312E81"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#312E81"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="CategoryRowStyle">
+   <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#0F172A"/>
+   <Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E1"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="TotalRowStyle">
+   <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#0F172A"/>
+   <Interior ss:Color="#FEF3C7" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Top" ss:LineStyle="Double" ss:Weight="3" ss:Color="#D97706"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#D97706"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="TextLeft">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F1F5F9"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="TextCenter">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F1F5F9"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="NumberStyle">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <NumberFormat ss:Format="#,##0"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F1F5F9"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="BoldNumberStyle">
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#1E293B"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <NumberFormat ss:Format="#,##0"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F1F5F9"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="CriticalNumberStyle">
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#B91C1C"/>
+   <Interior ss:Color="#FEE2E2" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <NumberFormat ss:Format="#,##0"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FCA5A5"/>
+   </Borders>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Relatorio_Estoque">
+  <Table>
+`;
+
+    // Column widths
+    activeCols.forEach(col => {
+      xml += `   <Column ss:Width="${col.width}"/>\n`;
+    });
+
+    // Title rows
+    xml += `   <Row ss:Height="24">
+    <Cell ss:MergeAcross="${activeCols.length - 1}" ss:StyleID="TitleStyle">
+     <Data ss:Type="String">ARENA VIVA BEACH - RELATÓRIO PERSONALIZADO DE ESTOQUE</Data>
+    </Cell>
+   </Row>
+   <Row ss:Height="18">
+    <Cell ss:MergeAcross="${activeCols.length - 1}" ss:StyleID="MetaStyle">
+     <Data ss:Type="String">Data: ${escapeXml(formatDateBR(selectedDate))} | Emitido por: ${escapeXml(currentUser?.name || 'Sistema')} | Total de Itens: ${totals.count} | Estoque Geral: ${totals.totalGeral} un</Data>
+    </Cell>
+   </Row>
+   <Row ss:Height="10"/>
+   <Row ss:Height="24">\n`;
+
+    activeCols.forEach(col => {
+      xml += `    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">${escapeXml(col.label)}</Data></Cell>\n`;
+    });
+    xml += `   </Row>\n`;
+
+    const renderXmlRow = (r) => {
+      let rowXml = `   <Row ss:Height="20">\n`;
+      activeCols.forEach(col => {
+        let val = r[col.key];
+        if (col.key === 'checked') val = r.isChecked ? 'SIM' : 'NÃO';
+        if (col.key === 'countedStock' && val === null) val = '';
+
+        const isNumeric = col.type === 'Number' && val !== '' && val !== null && val !== undefined && !isNaN(Number(val));
+        let styleId = 'TextCenter';
+        if (col.key === 'name' || col.key === 'category' || col.key === 'supplierName' || col.key === 'observation') {
+          styleId = 'TextLeft';
+        }
+        if (isNumeric) {
+          styleId = 'NumberStyle';
+          if (col.key === 'estoqueGeral') {
+            styleId = r.isCritical ? 'CriticalNumberStyle' : 'BoldNumberStyle';
+          }
+        }
+
+        if (isNumeric) {
+          rowXml += `    <Cell ss:StyleID="${styleId}"><Data ss:Type="Number">${Number(val)}</Data></Cell>\n`;
+        } else {
+          rowXml += `    <Cell ss:StyleID="${styleId}"><Data ss:Type="String">${escapeXml(val)}</Data></Cell>\n`;
+        }
+      });
+      rowXml += `   </Row>\n`;
+      return rowXml;
+    };
+
+    if (groupByCategory && groupedRows && groupedRows.length > 0) {
+      groupedRows.forEach(g => {
+        xml += `   <Row ss:Height="22">
+    <Cell ss:MergeAcross="${activeCols.length - 1}" ss:StyleID="CategoryRowStyle">
+     <Data ss:Type="String">CATEGORIA: ${escapeXml(g.category)} (${g.items.length} itens - Subtotal Geral: ${g.subtotalGeral} un)</Data>
+    </Cell>
+   </Row>\n`;
+        g.items.forEach(it => {
+          xml += renderXmlRow(it);
+        });
+      });
+    } else {
+      compiledRows.forEach(r => {
+        xml += renderXmlRow(r);
+      });
+    }
+
+    // Grand Totals Row
+    xml += `   <Row ss:Height="22">\n`;
+    activeCols.forEach((col, idx) => {
+      if (idx === 0) {
+        xml += `    <Cell ss:StyleID="TotalRowStyle"><Data ss:Type="String">TOTAL GERAL</Data></Cell>\n`;
+      } else if (col.key === 'estoqueLoja') {
+        xml += `    <Cell ss:StyleID="TotalRowStyle"><Data ss:Type="Number">${totals.totalLoja}</Data></Cell>\n`;
+      } else if (col.key === 'estoqueDeposito') {
+        xml += `    <Cell ss:StyleID="TotalRowStyle"><Data ss:Type="Number">${totals.totalDeposito}</Data></Cell>\n`;
+      } else if (col.key === 'estoqueGeral') {
+        xml += `    <Cell ss:StyleID="TotalRowStyle"><Data ss:Type="Number">${totals.totalGeral}</Data></Cell>\n`;
+      } else if (col.key === 'entries') {
+        xml += `    <Cell ss:StyleID="TotalRowStyle"><Data ss:Type="Number">${totals.totalEntradas}</Data></Cell>\n`;
+      } else if (col.key === 'saidas') {
+        xml += `    <Cell ss:StyleID="TotalRowStyle"><Data ss:Type="Number">${totals.totalSaidas}</Data></Cell>\n`;
+      } else {
+        xml += `    <Cell ss:StyleID="TotalRowStyle"><Data ss:Type="String"></Data></Cell>\n`;
+      }
+    });
+    xml += `   </Row>\n`;
+
+    xml += `  </Table>
+ </Worksheet>
+</Workbook>`;
+
+    return xml;
+  };
+
+  const handleExportXLM = (ext = 'xlm') => {
+    const xmlContent = generateXmlSpreadsheet();
+    const blob = new Blob([xmlContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `relatorio_estoque_viva_${selectedDate}.${ext}`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   // Export CSV
   const handleExportCSV = () => {
     const activeHeaders = [];
@@ -499,14 +734,33 @@ export default function ReportsView({
             <span>{copiedSummary ? 'Copiado!' : 'Copiar Resumo'}</span>
           </button>
 
+          {/* Botão de Exportação .xlm - Requisito explícito do usuário */}
+          <button
+            type="button"
+            onClick={() => handleExportXLM('xlm')}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition cursor-pointer ring-1 ring-emerald-400/50"
+            title="Exportar dados formatados para arquivo .xlm (Planilha nativa Excel com formatação, cabeçalhos e subtotais)"
+          >
+            <Download className="w-4 h-4" />
+            <span>Exportar .xlm</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleExportXLM('xml')}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white shadow-sm transition cursor-pointer"
+            title="Exportar arquivo no formato .xml"
+          >
+            <span>.xml</span>
+          </button>
+
           <button
             type="button"
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition cursor-pointer"
-            title="Exportar planilha Excel / CSV com as colunas selecionadas"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white border border-slate-600 transition cursor-pointer"
+            title="Exportar como CSV para Excel"
           >
-            <Download className="w-4 h-4" />
-            <span>Exportar Excel</span>
+            <span>.csv</span>
           </button>
 
           <button
@@ -1035,3 +1289,4 @@ export default function ReportsView({
     </div>
   );
 }
+

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import TopNavbar from './components/TopNavbar';
 import DailyCountView from './components/DailyCountView';
 import DashboardView from './components/DashboardView';
 import OrdersView from './components/OrdersView';
@@ -90,6 +91,10 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
   const [loading, setLoading] = useState(true);
 
+  // Sidebar Layout States
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   // Modals
   const [isProductsModalOpen, setIsProductsModalOpen] = useState(false);
   const [isUsersModalOpen, setIsUsersModalOpen] = useState(false);
@@ -117,34 +122,9 @@ export default function App() {
     });
   }, [products]);
 
-  // Fetch full data on initial mount or reload
+  // Fetch full data on initial mount or reload - SEMPRE PRESERVANDO DADOS
   const loadData = useCallback(async () => {
-    // 0. Migração única de zeramento solicitada pelo usuário: zera todos os estoques e contagens
-    const RESET_KEY = 'viva_reset_zeroed_v4';
-    const isFirstReset = localStorage.getItem(RESET_KEY) !== 'true';
-
-    if (isFirstReset) {
-      try {
-        localStorage.setItem(RESET_KEY, 'true');
-        localStorage.removeItem('viva_counts_history');
-        const cachedProds = localStorage.getItem('viva_products');
-        if (cachedProds) {
-          const parsed = JSON.parse(cachedProds);
-          parsed.forEach(p => { p.currentStock = 0; });
-          localStorage.setItem('viva_products', JSON.stringify(parsed));
-          setProducts(parsed);
-        }
-        setCountsHistory({ loja: {}, deposito: {} });
-        fetch(`${API_BASE}/reset-clean`, { 
-          method: 'POST',
-          headers: { 'X-Client-Id': clientIdRef.current }
-        }).catch(() => {});
-      } catch (e) {
-        console.warn('Erro ao zerar dados locais:', e);
-      }
-    }
-
-    // 1. Load from localStorage first so user changes never disappear
+    // 1. Carrega do localStorage primeiro para manter alterações salvas de imediato
     try {
       const cachedCounts = localStorage.getItem('viva_counts_history');
       const cachedProds = localStorage.getItem('viva_products');
@@ -152,16 +132,11 @@ export default function App() {
       const cachedUsers = localStorage.getItem('viva_users');
       const cachedSups = localStorage.getItem('viva_suppliers');
 
-      if (!isFirstReset && cachedCounts) {
+      if (cachedCounts) {
         setCountsHistory(JSON.parse(cachedCounts));
-      } else if (isFirstReset) {
-        setCountsHistory({ loja: {}, deposito: {} });
       }
-
       if (cachedProds) {
-        const parsed = JSON.parse(cachedProds);
-        if (isFirstReset) parsed.forEach(p => { p.currentStock = 0; });
-        setProducts(parsed);
+        setProducts(JSON.parse(cachedProds));
       }
       if (cachedCats) setCategories(JSON.parse(cachedCats));
       if (cachedUsers) setUsers(JSON.parse(cachedUsers));
@@ -185,19 +160,13 @@ export default function App() {
 
     let loadedFromFirebase = false;
 
-    // 2. Load from Firebase Cloud Firestore if active
+    // 2. Carrega do Firebase Cloud Firestore (banco em nuvem)
     if (isFirebaseConfigured()) {
       try {
         initFirebase();
-        if (isFirstReset) {
-          await resetAllStockAndCountsInFirestore();
-        }
         const fbData = await loadDataFromFirestore();
         if (fbData && fbData.products && fbData.products.length > 0) {
-          const loadedProds = isFirstReset
-            ? fbData.products.map(p => ({ ...p, currentStock: 0 }))
-            : fbData.products;
-          setProducts(loadedProds);
+          setProducts(fbData.products);
           setCategories(fbData.categories || []);
           setUsers(fbData.users || []);
           if (fbData.suppliers && fbData.suppliers.length > 0) {
@@ -205,12 +174,9 @@ export default function App() {
             try { localStorage.setItem('viva_suppliers', JSON.stringify(fbData.suppliers)); } catch (e) {}
           } else {
             setSuppliers(initialSuppliers);
-            try {
-              localStorage.setItem('viva_suppliers', JSON.stringify(initialSuppliers));
-              initialSuppliers.forEach(s => saveSupplierToFirestore(s));
-            } catch (e) {}
           }
-          const initialCounts = isFirstReset ? { loja: {}, deposito: {} } : (fbData.counts || {});
+
+          const initialCounts = fbData.counts || {};
           setCountsHistory(prev => {
             const merged = mergeCountsHistory(prev, initialCounts);
             try {
@@ -218,6 +184,7 @@ export default function App() {
             } catch (e) {}
             return merged;
           });
+
           if (fbData.users && fbData.users.length > 0) {
             setCurrentUserId(fbData.users[0].id);
           }
@@ -229,14 +196,13 @@ export default function App() {
       }
     }
 
-    // 3. Fallback to server API / local db
+    // 3. Fallback para API do servidor / banco local persistente (db.json)
     if (!loadedFromFirebase) {
       try {
         const res = await fetch(`${API_BASE}/data`);
         if (!res.ok) throw new Error('Falha ao conectar com servidor');
         const data = await res.json();
         const prods = data.products || [];
-        if (isFirstReset) prods.forEach(p => { p.currentStock = 0; });
         if (prods.length > 0) setProducts(prods);
         if (data.categories && data.categories.length > 0) setCategories(data.categories);
         if (data.users && data.users.length > 0) setUsers(data.users);
@@ -248,7 +214,7 @@ export default function App() {
         }
 
         let normalizedCounts = { loja: {}, deposito: {} };
-        if (!isFirstReset && data.counts) {
+        if (data.counts) {
           if (data.counts.loja || data.counts.deposito) {
             normalizedCounts = {
               loja: data.counts.loja || {},
@@ -271,7 +237,7 @@ export default function App() {
           setCurrentUserId(data.users[0].id);
         }
       } catch (err) {
-        console.warn('Backend indisponível, usando armazenamento local fallback:', err);
+        console.warn('Backend indisponível, usando armazenamento local preservado:', err);
       }
     }
 
@@ -1349,31 +1315,45 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 w-full">
-      <Header
+    <div className="min-h-screen flex bg-slate-50 w-full overflow-x-hidden">
+      {/* Menu Lateral (Sidebar) com todos os menus reunidos na lateral */}
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        selectedDate={selectedDate}
-        setSelectedDate={setSelectedDate}
         users={users}
         currentUserId={currentUserId}
         setCurrentUserId={handleUserChange}
-        saveStatus={saveStatus}
-        onOpenProducts={() => setIsProductsModalOpen(true)}
-        onOpenUsers={() => setIsUsersModalOpen(true)}
-        onOpenSuppliers={() => setIsSuppliersModalOpen(true)}
-        onOpenExport={() => setIsExportModalOpen(true)}
-        onOpenFirebase={() => setIsFirebaseModalOpen(true)}
-        isFirebaseActive={isFirebaseActive}
         summaryStats={summaryStats}
         depositoStats={depositoStats}
         ordersCount={ordersCount}
         criticalGeneralCount={generalStockStats.criticalCount}
         hasLowGeneralStock={generalStockStats.hasLowStock}
+        isFirebaseActive={isFirebaseActive}
+        onOpenProducts={() => setIsProductsModalOpen(true)}
+        onOpenUsers={() => setIsUsersModalOpen(true)}
+        onOpenSuppliers={() => setIsSuppliersModalOpen(true)}
+        onOpenExport={() => setIsExportModalOpen(true)}
+        onOpenFirebase={() => setIsFirebaseModalOpen(true)}
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
+        isMobileOpen={isMobileSidebarOpen}
+        setIsMobileOpen={setIsMobileSidebarOpen}
       />
 
-      {/* Main container: Full Width utilizing all left and right margins */}
-      <main className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-4 md:px-6 py-4">
+      {/* Conteúdo Principal com Barra Superior Limpa */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopNavbar
+          activeTab={activeTab}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          saveStatus={saveStatus}
+          users={users}
+          currentUserId={currentUserId}
+          onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+        />
+
+        {/* Main container: Full Width utilizing all left and right margins */}
+        <main className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-4 md:px-6 py-4">
         {activeTab === 'count' ? (
           <DailyCountView
             key={`loja-${selectedDate}`}
@@ -1511,6 +1491,7 @@ export default function App() {
         countsHistory={countsHistory}
         onReloadData={loadData}
       />
+      </div>
     </div>
   );
 }
