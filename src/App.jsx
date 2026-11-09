@@ -1366,6 +1366,7 @@ export default function App() {
           saveStatus={saveStatus}
           users={users}
           currentUserId={currentUserId}
+          setCurrentUserId={setCurrentUserId}
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
         />
 

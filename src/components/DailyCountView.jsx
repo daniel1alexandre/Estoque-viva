@@ -448,9 +448,8 @@ export default function DailyCountView({
           <table className="w-full text-left text-sm border-collapse min-w-[950px]">
             <thead>
               {isDeposito ? (
-                /* DEPÓSITO TABLE HEADER: Apenas Categoria, Produto, Estoque, Entradas e Observações (Contagem de Estoque removida) */
+                /* DEPÓSITO TABLE HEADER: Produto, Estoque, Entradas e Observações */
                 <tr className="bg-slate-50/90 text-slate-700 font-semibold text-xs border-b border-slate-200">
-                  <th className="py-3 px-3 text-left w-40">Categoria</th>
                   <th className="py-3 px-3 min-w-[280px]">Item / Produto</th>
                   <th className="py-3 px-2 text-center w-36">Estoque</th>
                   <th className="py-3 px-2 text-center w-36 bg-emerald-50/50 text-emerald-950 border-x border-emerald-100">Entradas (+)</th>
@@ -459,7 +458,6 @@ export default function DailyCountView({
               ) : (
                 /* LOJA TABLE HEADER: Completo com Contagem da Tarde, Última Contagem, Estoque Final, Diferença, Check e Observação */
                 <tr className="bg-slate-50/90 text-slate-700 font-semibold text-xs border-b border-slate-200">
-                  <th className="py-3 px-3 text-left w-32">Categoria</th>
                   <th className="py-3 px-3 min-w-[220px]">Item / Produto</th>
                   <th className="py-3 px-2 text-center w-28">Estoque Inicial</th>
                   <th className="py-3 px-2 text-center w-24 bg-emerald-50/50 text-emerald-950 border-x border-emerald-100">Entradas (+)</th>
@@ -475,7 +473,7 @@ export default function DailyCountView({
             <tbody className="divide-y divide-slate-100">
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={isDeposito ? 5 : 10} className="py-12 text-center text-slate-400">
+                  <td colSpan={isDeposito ? 4 : 9} className="py-12 text-center text-slate-400">
                     <Package className="w-10 h-10 mx-auto text-slate-300 mb-2" />
                     <p className="font-medium text-slate-600">Nenhum produto encontrado</p>
                     <p className="text-xs text-slate-400 mt-1">
@@ -519,14 +517,7 @@ export default function DailyCountView({
                         isChecked ? 'bg-emerald-50/25' : ''
                       }`}
                     >
-                      {/* 1. Categoria */}
-                      <td className="py-2.5 px-3">
-                        <span className="inline-block text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md whitespace-nowrap">
-                          {product.category}
-                        </span>
-                      </td>
-
-                      {/* 2. Item / Produto */}
+                      {/* 1. Item / Produto */}
                       <td className="py-2.5 px-3 min-w-[240px]">
                         {editingInlineProdId === product.id ? (
                           <div className="space-y-1.5 p-2 bg-blue-50/90 rounded-lg border border-blue-400 shadow-xs">
@@ -580,8 +571,13 @@ export default function DailyCountView({
                           </div>
                         ) : (
                           <div className="flex items-center justify-between group">
-                            <div className="font-semibold text-slate-900 leading-snug">
-                              {product.name}
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-900 leading-snug">
+                                {product.name}
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-medium">
+                                {product.category}
+                              </span>
                             </div>
                             <button
                               type="button"
@@ -590,7 +586,7 @@ export default function DailyCountView({
                                 setInlineName(product.name);
                                 setInlineCategory(product.category);
                               }}
-                              className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer"
+                              className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer shrink-0 ml-2"
                               title="Editar este item exatamente aqui"
                             >
                               <Edit2 className="w-3.5 h-3.5" />

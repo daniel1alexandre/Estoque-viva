@@ -12,7 +12,8 @@ import {
   Building2, 
   BarChart3, 
   FileText,
-  UserCheck
+  UserCheck,
+  ChevronDown
 } from 'lucide-react';
 import { formatDateBR } from '../utils/formatters';
 
@@ -23,6 +24,7 @@ export default function TopNavbar({
   saveStatus,
   users = [],
   currentUserId,
+  setCurrentUserId,
   onOpenMobileMenu
 }) {
   const currentUser = users.find(u => u.id === currentUserId) || users[0];
@@ -111,10 +113,31 @@ export default function TopNavbar({
             <span className="hidden md:inline text-[11px]">Sincronizado</span>
           </div>
 
-          {/* Active User Badge */}
-          <div className="flex items-center gap-1.5 bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200">
-            <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
-            <span className="truncate max-w-[120px]">{currentUser?.name || 'Conferente'}</span>
+          {/* Active User Selector */}
+          <div 
+            className="relative flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 transition shadow-2xs group cursor-pointer"
+            title="Clique para selecionar o usuário / conferente responsável"
+          >
+            <UserCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+            <select
+              value={currentUserId}
+              onChange={(e) => setCurrentUserId && setCurrentUserId(e.target.value)}
+              className="bg-transparent text-slate-800 text-xs font-bold focus:outline-none cursor-pointer pr-4 appearance-none z-10"
+              aria-label="Selecionar Usuário"
+            >
+              {users && users.length > 0 ? (
+                users.map(u => (
+                  <option key={u.id} value={u.id} className="text-slate-900 bg-white font-medium">
+                    {u.name}
+                  </option>
+                ))
+              ) : (
+                <option value={currentUserId} className="text-slate-900 bg-white font-medium">
+                  {currentUser?.name || 'Conferente'}
+                </option>
+              )}
+            </select>
+            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none group-hover:text-slate-600 transition" />
           </div>
         </div>
       </div>

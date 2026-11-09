@@ -361,7 +361,6 @@ export default function GeneralStockView({
           <table className="w-full text-left text-sm border-collapse min-w-[900px]">
             <thead>
               <tr className="bg-slate-50/90 text-slate-700 font-semibold text-xs border-b border-slate-200">
-                <th className="py-3 px-3 text-left w-36">Categoria</th>
                 <th className="py-3 px-3 min-w-[260px]">Produto</th>
                 <th className="py-3 px-2 text-center w-32 bg-blue-50/30 text-blue-950 border-x border-blue-100">
                   <div className="flex items-center justify-center gap-1">
@@ -391,7 +390,7 @@ export default function GeneralStockView({
             <tbody className="divide-y divide-slate-100">
               {filteredInventory.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
                     <Package className="w-10 h-10 mx-auto text-slate-300 mb-2" />
                     <p className="font-medium text-slate-600">Nenhum produto encontrado</p>
                     <p className="text-xs text-slate-400 mt-1">
@@ -412,13 +411,6 @@ export default function GeneralStockView({
                           : 'hover:bg-slate-50/90'
                       }`}
                     >
-                      {/* Categoria */}
-                      <td className="py-3 px-3">
-                        <span className="inline-block text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-md whitespace-nowrap">
-                          {product.category}
-                        </span>
-                      </td>
-
                       {/* Produto com destaque se crítico */}
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2">
@@ -433,7 +425,8 @@ export default function GeneralStockView({
                               {product.name}
                             </div>
                             <div className="text-[11px] text-slate-400">
-                              Unidade: <span className="font-medium text-slate-600">{product.unit || 'UN'}</span>
+                              <span className="font-medium text-slate-600">{product.category}</span>
+                              {product.unit && <> • Unidade: <span className="font-medium text-slate-600">{product.unit}</span></>}
                               {product.code && <> • Cód: {product.code}</>}
                             </div>
                           </div>
