@@ -190,10 +190,21 @@ export default function Sidebar({
               </select>
             </div>
           ) : (
-            <div className="flex justify-center" title={`Conferente Responsável: ${currentUser?.name || 'Geral'}`}>
-              <div className="w-9 h-9 rounded-xl bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 flex items-center justify-center font-bold text-xs shadow-xs">
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  if (users && users.length > 1) {
+                    const idx = users.findIndex(u => u.id === currentUserId);
+                    const nextUser = users[(idx + 1) % users.length];
+                    setCurrentUserId(nextUser.id);
+                  }
+                }}
+                className="w-9 h-9 rounded-xl bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 hover:text-white border border-indigo-500/30 flex items-center justify-center font-bold text-xs shadow-xs cursor-pointer transition"
+                title={`Conferente Responsável: ${currentUser?.name || 'Geral'} (Clique para alternar conferente)`}
+              >
                 {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'CO'}
-              </div>
+              </button>
             </div>
           )}
         </div>

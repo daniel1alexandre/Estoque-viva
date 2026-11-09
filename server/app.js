@@ -367,11 +367,11 @@ app.post('/api/products', (req, res) => {
       db.products[index] = {
         ...db.products[index],
         code: code || db.products[index].code,
-        name,
+        name: name.trim(),
         category,
-        unit: unit || 'UN',
-        minStock: Number(minStock) || 0,
-        currentStock: Number(currentStock) || 0,
+        unit: unit || db.products[index].unit || 'UN',
+        minStock: minStock !== undefined ? Number(minStock) : (db.products[index].minStock || 0),
+        currentStock: currentStock !== undefined ? Number(currentStock) : (db.products[index].currentStock || 0),
         supplierId: supplierId !== undefined ? supplierId : db.products[index].supplierId,
         supplierName: supplierName !== undefined ? supplierName : db.products[index].supplierName
       };

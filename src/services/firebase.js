@@ -210,21 +210,50 @@ export async function batchCheckInFirestore(location, date, productIds, checkSta
   }
 }
 
+// Helper to strip undefined values so Firestore never throws unsupported field value errors
+function sanitizeFirestoreData(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeFirestoreData(item)).filter(item => item !== undefined);
+  }
+  const cleaned = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) {
+      cleaned[key] = null;
+    } else if (value && typeof value === 'object' && !(value instanceof Date)) {
+      cleaned[key] = sanitizeFirestoreData(value);
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
 // Product CRUD
 export async function saveProductToFirestore(product) {
   const db = getDb();
   if (!db) return;
-  const prodId = product.id || 'prod-' + Date.now();
-  const prodRef = doc(db, 'products', prodId);
-  await setDoc(prodRef, { ...product, id: prodId }, { merge: true });
-  return { ...product, id: prodId };
+  try {
+    const prodId = product.id || 'prod-' + Date.now();
+    const prodRef = doc(db, 'products', prodId);
+    const sanitized = sanitizeFirestoreData({ ...product, id: prodId });
+    await setDoc(prodRef, sanitized, { merge: true });
+    return sanitized;
+  } catch (err) {
+    console.error('Erro ao salvar produto no Firestore:', err);
+    throw err;
+  }
 }
 
 export async function deleteProductFromFirestore(productId) {
   const db = getDb();
   if (!db) return;
-  const prodRef = doc(db, 'products', productId);
-  await deleteDoc(prodRef);
+  try {
+    const prodRef = doc(db, 'products', productId);
+    await deleteDoc(prodRef);
+  } catch (err) {
+    console.error('Erro ao deletar produto no Firestore:', err);
+  }
 }
 
 // Categories

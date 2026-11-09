@@ -821,16 +821,32 @@ export default function App() {
     }
   }, [selectedDate, currentLocation, users, currentUserId]);
 
-  // Products CRUD
+  // Products CRUD - Persistência garantida no Banco de Dados
   const handleSaveProduct = async (productData) => {
+    let currentSavedProduct = productData;
+
+    // 1. Atualização imediata no estado e no armazenamento local
     setProducts(prev => {
       const index = prev.findIndex(p => p.id === productData.id);
       const next = index !== -1 ? [...prev] : [...prev, productData];
-      if (index !== -1) next[index] = productData;
+      if (index !== -1) {
+        next[index] = { ...prev[index], ...productData };
+        currentSavedProduct = next[index];
+      }
       try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
       return next;
     });
 
+    // 2. Persistência no Firebase Cloud Firestore
+    if (isFirebaseConfigured()) {
+      try {
+        await saveProductToFirestore(currentSavedProduct);
+      } catch (fbErr) {
+        console.warn('Aviso: erro ao salvar produto no Firestore:', fbErr);
+      }
+    }
+
+    // 3. Persistência no Backend do Servidor (db.json / API)
     try {
       const res = await fetch(`${API_BASE}/products`, {
         method: 'POST',
@@ -838,31 +854,30 @@ export default function App() {
           'Content-Type': 'application/json',
           'X-Client-Id': clientIdRef.current
         },
-        body: JSON.stringify(productData)
+        body: JSON.stringify(currentSavedProduct)
       });
-      const data = await res.json();
-      const savedProd = data.product || productData;
-      
-      setProducts(prev => {
-        const index = prev.findIndex(p => p.id === savedProd.id);
-        const next = [...prev];
-        if (index !== -1) {
-          next[index] = savedProd;
-        } else {
-          next.push(savedProd);
-        }
-        try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
-        return next;
-      });
+      if (res.ok) {
+        const data = await res.json();
+        const savedProd = data.product || currentSavedProduct;
+        
+        setProducts(prev => {
+          const index = prev.findIndex(p => p.id === savedProd.id);
+          const next = [...prev];
+          if (index !== -1) {
+            next[index] = savedProd;
+          } else {
+            next.push(savedProd);
+          }
+          try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
+          return next;
+        });
 
-      if (isFirebaseConfigured()) {
-        saveProductToFirestore(savedProd);
+        if (isFirebaseConfigured()) {
+          saveProductToFirestore(savedProd).catch(() => {});
+        }
       }
     } catch (err) {
-      console.error('Erro ao salvar produto no servidor, mantido localmente:', err);
-      if (isFirebaseConfigured()) {
-        saveProductToFirestore(productData);
-      }
+      console.warn('Backend indisponível ao salvar produto, garantido no Firestore e localmente:', err);
     }
   };
 
@@ -1364,9 +1379,6 @@ export default function App() {
           selectedDate={selectedDate}
           setSelectedDate={setSelectedDate}
           saveStatus={saveStatus}
-          users={users}
-          currentUserId={currentUserId}
-          setCurrentUserId={setCurrentUserId}
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
         />
 

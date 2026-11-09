@@ -55,10 +55,16 @@ export default function DailyCountView({
   const handleSaveStockAdjustment = (prodId, isDep = false, currentEntries = 0) => {
     const num = Number(adjustedStockValue);
     if (!isNaN(num) && num >= 0) {
-      if (isDep) {
-        onUpdateItem(prodId, { currentStock: Math.max(0, num - currentEntries) });
-      } else {
-        onUpdateItem(prodId, { currentStock: num });
+      const newStock = isDep ? Math.max(0, num - currentEntries) : num;
+      onUpdateItem(prodId, { currentStock: newStock });
+      if (onSaveProduct) {
+        const prod = products.find(p => p.id === prodId);
+        if (prod) {
+          onSaveProduct({
+            ...prod,
+            currentStock: newStock
+          });
+        }
       }
     }
     setEditingStockProdId(null);
@@ -460,7 +466,7 @@ export default function DailyCountView({
                 <tr className="bg-slate-50/90 text-slate-700 font-semibold text-xs border-b border-slate-200">
                   <th className="py-3 px-3 min-w-[220px]">Item / Produto</th>
                   <th className="py-3 px-2 text-center w-28">Estoque Inicial</th>
-                  <th className="py-3 px-2 text-center w-24 bg-emerald-50/50 text-emerald-950 border-x border-emerald-100">Entradas (+)</th>
+                  <th className="py-3 px-2 text-center w-32 bg-emerald-50/50 text-emerald-950 border-x border-emerald-100">Entradas (+)</th>
                   <th className="py-3 px-2 text-center w-32 bg-amber-50/60 text-amber-950 font-bold border-r border-amber-200">Contagem da Tarde</th>
                   <th className="py-3 px-2 text-center w-32 bg-amber-50/60 text-amber-950 font-bold border-r border-amber-200">Última Contagem</th>
                   <th className="py-3 px-2 text-center w-28 font-bold text-slate-900 bg-slate-100/70 border-r border-slate-200">Estoque Final</th>
@@ -545,12 +551,13 @@ export default function DailyCountView({
                                   if (!inlineName.trim()) return;
                                   if (onSaveProduct) {
                                     onSaveProduct({
+                                      ...product,
                                       id: product.id,
                                       name: inlineName.trim(),
                                       category: inlineCategory,
                                       unit: product.unit || 'UN',
-                                      minStock: product.minStock,
-                                      currentStock: product.currentStock
+                                      minStock: product.minStock !== undefined ? product.minStock : 10,
+                                      currentStock: product.currentStock !== undefined ? product.currentStock : 0
                                     });
                                   }
                                   setEditingInlineProdId(null);
@@ -660,7 +667,7 @@ export default function DailyCountView({
                         )}
                       </td>
 
-                      {/* 4. Entradas (+) */}
+                      {/* 2. Entradas (+) */}
                       <td className="py-2.5 px-2 text-center bg-emerald-50/20 border-x border-emerald-100/50">
                         <input
                           type="number"
@@ -671,7 +678,7 @@ export default function DailyCountView({
                             const val = e.target.value === '' ? 0 : Number(e.target.value);
                             onUpdateItem(product.id, { entries: val });
                           }}
-                          className="w-18 mx-auto text-center font-bold text-emerald-800 bg-white border border-emerald-200 rounded-md py-1 px-1 focus:ring-2 focus:ring-emerald-500 focus:outline-none shadow-2xs text-sm"
+                          className="w-20 mx-auto text-center font-bold text-emerald-800 bg-white border border-emerald-300 rounded-md py-1 px-1 focus:ring-2 focus:ring-emerald-500 focus:outline-none shadow-2xs text-sm"
                         />
                       </td>
 

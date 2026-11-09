@@ -11,9 +11,7 @@ import {
   ShoppingCart, 
   Building2, 
   BarChart3, 
-  FileText,
-  UserCheck,
-  ChevronDown
+  FileText
 } from 'lucide-react';
 import { formatDateBR } from '../utils/formatters';
 
@@ -22,12 +20,8 @@ export default function TopNavbar({
   selectedDate,
   setSelectedDate,
   saveStatus,
-  users = [],
-  currentUserId,
-  setCurrentUserId,
   onOpenMobileMenu
 }) {
-  const currentUser = users.find(u => u.id === currentUserId) || users[0];
 
   const tabTitles = {
     count: { title: 'Controle de Estoque - Loja / Frente', subtitle: 'Conferência física diária e apuração de saídas', icon: Store, color: 'text-blue-600' },
@@ -106,38 +100,11 @@ export default function TopNavbar({
 
           {/* Multi-device Live Sync Badge */}
           <div 
-            className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200" 
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200" 
             title="Sincronização em tempo real ativa"
           >
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-            <span className="hidden md:inline text-[11px]">Sincronizado</span>
-          </div>
-
-          {/* Active User Selector */}
-          <div 
-            className="relative flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 transition shadow-2xs group cursor-pointer"
-            title="Clique para selecionar o usuário / conferente responsável"
-          >
-            <UserCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-            <select
-              value={currentUserId}
-              onChange={(e) => setCurrentUserId && setCurrentUserId(e.target.value)}
-              className="bg-transparent text-slate-800 text-xs font-bold focus:outline-none cursor-pointer pr-4 appearance-none z-10"
-              aria-label="Selecionar Usuário"
-            >
-              {users && users.length > 0 ? (
-                users.map(u => (
-                  <option key={u.id} value={u.id} className="text-slate-900 bg-white font-medium">
-                    {u.name}
-                  </option>
-                ))
-              ) : (
-                <option value={currentUserId} className="text-slate-900 bg-white font-medium">
-                  {currentUser?.name || 'Conferente'}
-                </option>
-              )}
-            </select>
-            <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 pointer-events-none group-hover:text-slate-600 transition" />
+            <span className="text-[11px]">Sincronizado</span>
           </div>
         </div>
       </div>
