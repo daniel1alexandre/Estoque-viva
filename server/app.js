@@ -157,6 +157,37 @@ let db = loadDatabase();
 
 // ---------------- ROUTES ----------------
 
+// Firebase configuration auto-sync across devices
+app.get('/api/firebase-config', (req, res) => {
+  if (db.firebaseConfig && db.firebaseConfig.apiKey && db.firebaseConfig.projectId) {
+    return res.json({ configured: true, config: db.firebaseConfig });
+  }
+  // Check process environment variables (e.g. on Vercel deployment)
+  if (process.env.VITE_FIREBASE_API_KEY && process.env.VITE_FIREBASE_PROJECT_ID) {
+    const envConfig = {
+      apiKey: process.env.VITE_FIREBASE_API_KEY,
+      authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+      messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+      appId: process.env.VITE_FIREBASE_APP_ID || ''
+    };
+    return res.json({ configured: true, config: envConfig });
+  }
+  res.json({ configured: false, config: null });
+});
+
+app.post('/api/firebase-config', (req, res) => {
+  const { config } = req.body;
+  const clientId = req.headers['x-client-id'];
+  if (config && config.apiKey && config.projectId) {
+    db.firebaseConfig = config;
+    saveDatabase(db, clientId);
+    return res.json({ success: true, message: 'Configuração do Firebase salva no servidor com sucesso' });
+  }
+  res.status(400).json({ error: 'Configuração inválida' });
+});
+
 app.get('/api/version', (req, res) => {
   res.json({ version: dbVersion });
 });

@@ -9,7 +9,10 @@ import {
   RefreshCw, 
   ArrowUpRight,
   ShieldCheck,
-  Cloud
+  Cloud,
+  Share2,
+  Copy,
+  Check
 } from 'lucide-react';
 import { 
   getFirebaseConfig, 
@@ -40,6 +43,7 @@ export default function FirebaseConfigModal({
   const [statusMessage, setStatusMessage] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -52,6 +56,7 @@ export default function FirebaseConfigModal({
       setAppId(current.appId || '');
       setIsConfigured(isFirebaseConfigured());
       setStatusMessage(null);
+      setCopiedLink(false);
     }
   }, [isOpen]);
 
@@ -103,10 +108,18 @@ export default function FirebaseConfigModal({
     };
 
     saveFirebaseConfig(newConfig);
+    
+    // Also save to backend server so other devices can auto-configure
+    fetch('/api/firebase-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: newConfig })
+    }).catch(err => console.warn('Aviso: servidor offline para salvar config do Firebase:', err));
+
     const db = initFirebase();
     if (db) {
       setIsConfigured(true);
-      setStatusMessage({ type: 'success', text: 'Firebase configurado com sucesso! Conexão ativa.' });
+      setStatusMessage({ type: 'success', text: 'Firebase configurado com sucesso! Conexão em nuvem ativa para todos os dispositivos.' });
       if (onReloadData) {
         onReloadData();
       }
@@ -115,8 +128,37 @@ export default function FirebaseConfigModal({
     }
   };
 
+  const handleCopyShareLink = () => {
+    if (!apiKey.trim() || !projectId.trim()) {
+      setStatusMessage({ type: 'error', text: 'Preencha a API Key e o Project ID antes de gerar o link de compartilhamento.' });
+      return;
+    }
+    const cfg = {
+      apiKey: apiKey.trim(),
+      projectId: projectId.trim(),
+      authDomain: authDomain.trim(),
+      storageBucket: storageBucket.trim(),
+      messagingSenderId: messagingSenderId.trim(),
+      appId: appId.trim()
+    };
+    const encoded = encodeURIComponent(btoa(JSON.stringify(cfg)));
+    const link = `${window.location.origin}/?fb_cfg=${encoded}`;
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setStatusMessage({ 
+      type: 'success', 
+      text: 'Link de conexão copiado! Abra este link nos outros celulares ou PCs para conectar todos automaticamente à mesma nuvem.' 
+    });
+    setTimeout(() => setCopiedLink(false), 5000);
+  };
+
   const handleDisconnect = () => {
     saveFirebaseConfig(null);
+    fetch('/api/firebase-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config: null })
+    }).catch(() => {});
     setApiKey('');
     setProjectId('');
     setAuthDomain('');
@@ -281,6 +323,29 @@ export default function FirebaseConfigModal({
               />
             </div>
           </div>
+
+          {/* Multi-device instant share link */}
+          {isConfigured && (
+            <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between gap-3">
+              <div>
+                <div className="font-bold text-blue-950 text-xs flex items-center gap-1.5">
+                  <Share2 className="w-4 h-4 text-blue-600" />
+                  Conectar Outros Celulares e Computadores
+                </div>
+                <p className="text-[11px] text-blue-800/80">
+                  Gera um link que ativa automaticamente a sincronização em tempo real em qualquer outro aparelho via WhatsApp.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyShareLink}
+                className="shrink-0 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+              >
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedLink ? 'Copiado!' : 'Copiar Link'}
+              </button>
+            </div>
+          )}
 
           {/* Sync action button */}
           {isConfigured && (

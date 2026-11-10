@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X, Plus, Edit2, Trash2, Package, Layers, Check, Search, RotateCcw } from 'lucide-react';
+import { normalizeCategoryName } from '../utils/formatters';
 
 export default function ProductManagementModal({
   isOpen,
@@ -53,11 +54,11 @@ export default function ProductManagementModal({
     setIsCreatingNew(false);
     setEditingProductId(prod.id);
     setEditName(prod.name);
+    const normCat = normalizeCategoryName(prod.category);
     const matchedCat = categories.find(c => 
-      c.localeCompare(prod.category, undefined, { sensitivity: 'accent' }) === 0 ||
-      c.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() === (prod.category || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+      normalizeCategoryName(c).toUpperCase() === normCat.toUpperCase()
     );
-    setEditCategory(matchedCat || prod.category);
+    setEditCategory(matchedCat || normCat);
     setEditUnit(prod.unit || 'UN');
     setEditMinStock(String(prod.minStock || 0));
     setEditStock(String(prod.currentStock || 0));
@@ -99,8 +100,12 @@ export default function ProductManagementModal({
     if (!newName.trim()) return;
 
     const matchedSup = suppliers.find(s => s.id === newSupplierId);
+    const generatedId = 'prod-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+    const generatedCode = `COD-${Math.floor(100 + Math.random() * 900)}`;
 
     onSaveProduct({
+      id: generatedId,
+      code: generatedCode,
       name: newName.trim(),
       category: newCategory,
       unit: newUnit.trim() || 'UN',
@@ -415,7 +420,7 @@ export default function ProductManagementModal({
                             {categories.map(c => (
                               <option key={c} value={c}>{c}</option>
                             ))}
-                            {editCategory && !categories.includes(editCategory) && (
+                            {editCategory && !categories.some(c => normalizeCategoryName(c).toUpperCase() === normalizeCategoryName(editCategory).toUpperCase()) && (
                               <option value={editCategory}>{editCategory}</option>
                             )}
                           </select>

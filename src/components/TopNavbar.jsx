@@ -11,7 +11,9 @@ import {
   ShoppingCart, 
   Building2, 
   BarChart3, 
-  FileText
+  FileText,
+  Cloud,
+  CloudOff
 } from 'lucide-react';
 import { formatDateBR } from '../utils/formatters';
 
@@ -20,7 +22,9 @@ export default function TopNavbar({
   selectedDate,
   setSelectedDate,
   saveStatus,
-  onOpenMobileMenu
+  onOpenMobileMenu,
+  isFirebaseActive = false,
+  onOpenFirebase
 }) {
 
   const tabTitles = {
@@ -141,13 +145,28 @@ export default function TopNavbar({
           </div>
 
           {/* Multi-device Live Sync Badge */}
-          <div 
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200" 
-            title="Sincronização em tempo real ativa"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-            <span className="text-[11px]">Sincronizado</span>
-          </div>
+          {isFirebaseActive ? (
+            <button
+              type="button"
+              onClick={onOpenFirebase}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 transition cursor-pointer"
+              title="Nuvem Firebase em Tempo Real Ativa (Celulares e PCs conectados). Clique para gerenciar."
+            >
+              <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+              <span className="text-[11px]">Nuvem Conectada</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenFirebase}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition cursor-pointer animate-pulse"
+              title="Atenção: Modo Apenas Local. Clique aqui para conectar à Nuvem Firebase e sincronizar entre celulares e PCs."
+            >
+              <CloudOff className="w-3.5 h-3.5 text-amber-600" />
+              <span className="text-[11px]">Conectar Nuvem (Celulares/PCs)</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

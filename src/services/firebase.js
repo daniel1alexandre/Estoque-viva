@@ -14,8 +14,53 @@ import {
 
 const STORAGE_KEY = 'viva_firebase_config';
 
-// Retrieve config from Vite Env variables or localStorage
+// Check for ?fb_cfg= in URL on startup for zero-friction mobile/multi-device connection
+export function checkUrlFirebaseConfig() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fbCfgParam = params.get('fb_cfg');
+    if (fbCfgParam) {
+      const decoded = JSON.parse(atob(decodeURIComponent(fbCfgParam)));
+      if (decoded.apiKey && decoded.projectId) {
+        saveFirebaseConfig(decoded);
+        // Clean URL parameter without reloading
+        const url = new URL(window.location.href);
+        url.searchParams.delete('fb_cfg');
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ''));
+        return decoded;
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao processar fb_cfg da URL:', e);
+  }
+  return null;
+}
+
+// Fetch Firebase config from backend /api/firebase-config
+export async function fetchServerFirebaseConfig() {
+  try {
+    const res = await fetch('/api/firebase-config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.configured && data.config && data.config.apiKey && data.config.projectId) {
+        saveFirebaseConfig(data.config);
+        return data.config;
+      }
+    }
+  } catch (e) {
+    // server unreachable or offline
+  }
+  return null;
+}
+
+// Retrieve config from URL param, localStorage, or Vite Env variables
 export function getFirebaseConfig() {
+  // 1. Check URL query param first
+  const fromUrl = checkUrlFirebaseConfig();
+  if (fromUrl) return fromUrl;
+
+  // 2. Check localStorage
   const localSaved = localStorage.getItem(STORAGE_KEY);
   if (localSaved) {
     try {
@@ -28,7 +73,7 @@ export function getFirebaseConfig() {
     }
   }
 
-  // Fallback to Vite environment variables
+  // 3. Fallback to Vite environment variables
   return {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',

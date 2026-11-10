@@ -20,7 +20,7 @@ import {
   MessageSquare,
   Calendar
 } from 'lucide-react';
-import { formatDateBR } from '../utils/formatters';
+import { formatDateBR, normalizeCategoryName } from '../utils/formatters';
 
 export default function DailyCountView({
   selectedDate,
@@ -80,7 +80,7 @@ export default function DailyCountView({
   const filteredProducts = useMemo(() => {
     return products.filter(prod => {
       // Category filter
-      if (selectedCategory !== 'TODAS' && prod.category !== selectedCategory) {
+      if (selectedCategory !== 'TODAS' && normalizeCategoryName(prod.category).toUpperCase() !== normalizeCategoryName(selectedCategory).toUpperCase()) {
         return false;
       }
 
@@ -411,7 +411,7 @@ export default function DailyCountView({
             Todas ({products.length})
           </button>
           {categories.map(cat => {
-            const countInCat = products.filter(p => p.category === cat).length;
+            const countInCat = products.filter(p => normalizeCategoryName(p.category).toUpperCase() === normalizeCategoryName(cat).toUpperCase()).length;
             return (
               <button
                 key={cat}
@@ -550,7 +550,7 @@ export default function DailyCountView({
                                   className="text-[11px] border border-blue-300 rounded px-1.5 py-1 bg-white font-medium flex-1 focus:outline-none"
                                 >
                                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                                  {inlineCategory && !categories.includes(inlineCategory) && (
+                                  {inlineCategory && !categories.some(c => normalizeCategoryName(c).toUpperCase() === normalizeCategoryName(inlineCategory).toUpperCase()) && (
                                     <option value={inlineCategory}>{inlineCategory}</option>
                                   )}
                                 </select>
@@ -563,7 +563,7 @@ export default function DailyCountView({
                                       ...product,
                                       id: product.id,
                                       name: inlineName.trim(),
-                                      category: inlineCategory,
+                                      category: normalizeCategoryName(inlineCategory),
                                       unit: product.unit || 'UN',
                                       minStock: product.minStock !== undefined ? product.minStock : 10,
                                       currentStock: product.currentStock !== undefined ? product.currentStock : 0
@@ -592,7 +592,7 @@ export default function DailyCountView({
                                 {product.name}
                               </div>
                               <span className="text-[10px] text-slate-400 font-medium">
-                                {product.category}
+                                {normalizeCategoryName(product.category)}
                               </span>
                             </div>
                             <button
@@ -600,11 +600,11 @@ export default function DailyCountView({
                               onClick={() => {
                                 setEditingInlineProdId(product.id);
                                 setInlineName(product.name);
+                                const normCat = normalizeCategoryName(product.category);
                                 const matchedCat = categories.find(c => 
-                                  c.localeCompare(product.category, undefined, { sensitivity: 'accent' }) === 0 ||
-                                  c.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() === (product.category || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+                                  normalizeCategoryName(c).toUpperCase() === normCat.toUpperCase()
                                 );
-                                setInlineCategory(matchedCat || product.category);
+                                setInlineCategory(matchedCat || normCat);
                               }}
                               className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer shrink-0 ml-2"
                               title="Editar este item exatamente aqui"

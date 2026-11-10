@@ -77,3 +77,14 @@ export function exportCountToCSV(date, products, countItems, users) {
   document.body.removeChild(link);
 }
 
+// Canonical category normalizer to prevent accent/spelling mismatches across devices and lists
+export function normalizeCategoryName(cat) {
+  if (!cat || typeof cat !== 'string') return '';
+  const trimmed = cat.trim();
+  const unaccented = trimmed.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  if (unaccented === 'BARRA DE PROTEINA' || unaccented === 'BARRA DE PROTEINAS' || unaccented === 'BARRAS DE PROTEINAS' || unaccented === 'BARRA DE PROTEÍNAS' || unaccented === 'BARRA DE PROTÉINAS') {
+    return 'BARRA DE PROTEÍNAS';
+  }
+  return trimmed;
+}
+

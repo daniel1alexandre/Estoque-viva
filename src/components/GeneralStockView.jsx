@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   Download
 } from 'lucide-react';
+import { normalizeCategoryName } from '../utils/formatters';
 
 export default function GeneralStockView({
   products = [],
@@ -136,7 +137,7 @@ export default function GeneralStockView({
   const filteredInventory = useMemo(() => {
     return inventoryList.filter(item => {
       // Category filter
-      if (selectedCategory !== 'TODAS' && item.product.category !== selectedCategory) {
+      if (selectedCategory !== 'TODAS' && normalizeCategoryName(item.product.category).toUpperCase() !== normalizeCategoryName(selectedCategory).toUpperCase()) {
         return false;
       }
 
@@ -362,7 +363,7 @@ export default function GeneralStockView({
             Todas ({products.length})
           </button>
           {categories.map(cat => {
-            const countInCat = products.filter(p => p.category === cat).length;
+            const countInCat = products.filter(p => normalizeCategoryName(p.category).toUpperCase() === normalizeCategoryName(cat).toUpperCase()).length;
             return (
               <button
                 key={cat}

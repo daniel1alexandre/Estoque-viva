@@ -11,7 +11,7 @@ import UserManagementModal from './components/UserManagementModal';
 import SupplierManagementModal from './components/SupplierManagementModal';
 import ExportModal from './components/ExportModal';
 import FirebaseConfigModal from './components/FirebaseConfigModal';
-import { getTodayDateString } from './utils/formatters';
+import { getTodayDateString, normalizeCategoryName } from './utils/formatters';
 import { initialSuppliers } from './data/initialData';
 import {
   isFirebaseConfigured,
@@ -27,19 +27,68 @@ import {
   saveSupplierToFirestore,
   deleteSupplierFromFirestore,
   subscribeToRealtimeFirestore,
-  resetAllStockAndCountsInFirestore
+  resetAllStockAndCountsInFirestore,
+  fetchServerFirebaseConfig,
+  checkUrlFirebaseConfig
 } from './services/firebase';
 
 const API_BASE = '/api';
 
+// Blacklist of deleted products so deleted items stay deleted across reloads and syncs
+function getDeletedProductIds() {
+  try {
+    const raw = localStorage.getItem('viva_deleted_products');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function addDeletedProductId(id) {
+  try {
+    const list = getDeletedProductIds();
+    if (!list.includes(id)) {
+      list.push(id);
+      localStorage.setItem('viva_deleted_products', JSON.stringify(list));
+    }
+  } catch (e) {}
+}
+
+function removeDeletedProductId(id) {
+  try {
+    const list = getDeletedProductIds().filter(i => i !== id);
+    localStorage.setItem('viva_deleted_products', JSON.stringify(list));
+  } catch (e) {}
+}
+
 // Category Normalizer to fix typos like "BARRA DE PROTÉINAS" -> "BARRA DE PROTEÍNAS"
 function normalizeProductCategory(p) {
   if (!p) return p;
-  let cat = p.category;
-  if (cat && (cat === 'BARRA DE PROTÉINAS' || cat === 'BARRA DE PROTEINA' || cat === 'BARRAS DE PROTEINA')) {
-    cat = 'BARRA DE PROTEÍNAS';
-  }
-  return { ...p, category: cat };
+  return {
+    ...p,
+    category: normalizeCategoryName(p.category)
+  };
+}
+
+// Safe product merger that NEVER drops locally registered products and respects deletions
+function mergeProductList(currentList = [], incomingList = []) {
+  const deletedIds = new Set(getDeletedProductIds());
+  const map = new Map();
+
+  (currentList || []).forEach(p => {
+    if (p && p.id && !deletedIds.has(p.id)) {
+      map.set(p.id, normalizeProductCategory(p));
+    }
+  });
+
+  (incomingList || []).forEach(p => {
+    if (p && p.id && !deletedIds.has(p.id)) {
+      const existing = map.get(p.id);
+      map.set(p.id, normalizeProductCategory(existing ? { ...existing, ...p } : p));
+    }
+  });
+
+  return Array.from(map.values());
 }
 
 // Helper to check if an item has actual user-entered data
@@ -200,6 +249,17 @@ export default function App() {
 
   // Fetch full data on initial mount or reload - SEMPRE PRESERVANDO DADOS
   const loadData = useCallback(async () => {
+    // 0. Auto-detecta configuração do Firebase pela URL ou pelo backend para conectar todos os aparelhos automaticamente
+    try {
+      let fbCfg = checkUrlFirebaseConfig();
+      if (!fbCfg && !isFirebaseConfigured()) {
+        fbCfg = await fetchServerFirebaseConfig();
+      }
+      if (fbCfg || isFirebaseConfigured()) {
+        setIsFirebaseActive(true);
+      }
+    } catch (e) {}
+
     // 1. Carrega do localStorage primeiro para manter alterações salvas de imediato
     try {
       const cachedCounts = localStorage.getItem('viva_counts_history');
@@ -213,9 +273,18 @@ export default function App() {
       }
       if (cachedProds) {
         const parsed = JSON.parse(cachedProds);
-        setProducts(Array.isArray(parsed) ? parsed.map(normalizeProductCategory) : []);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProducts(prev => mergeProductList(prev, parsed));
+        }
       }
-      if (cachedCats) setCategories(JSON.parse(cachedCats));
+      if (cachedCats) {
+        try {
+          const parsedCats = JSON.parse(cachedCats);
+          if (Array.isArray(parsedCats)) {
+            setCategories(Array.from(new Set(parsedCats.map(normalizeCategoryName))));
+          }
+        } catch (e) {}
+      }
       if (cachedUsers) {
         const parsedU = JSON.parse(cachedUsers);
         setUsers(mergeUserList([], parsedU));
@@ -246,8 +315,14 @@ export default function App() {
         initFirebase();
         const fbData = await loadDataFromFirestore();
         if (fbData && fbData.products && fbData.products.length > 0) {
-          setProducts(fbData.products.map(normalizeProductCategory));
-          setCategories(fbData.categories || []);
+          setProducts(prev => {
+            const merged = mergeProductList(prev, fbData.products);
+            try { localStorage.setItem('viva_products', JSON.stringify(merged)); } catch (e) {}
+            return merged;
+          });
+          if (fbData.categories && fbData.categories.length > 0) {
+            setCategories(Array.from(new Set(fbData.categories.map(normalizeCategoryName))));
+          }
           setUsers(prev => mergeUserList(prev, fbData.users || []));
           if (fbData.suppliers && fbData.suppliers.length > 0) {
             setSuppliers(fbData.suppliers);
@@ -285,14 +360,14 @@ export default function App() {
         const prods = (data.products || []).map(normalizeProductCategory);
         if (prods.length > 0) {
           setProducts(prev => {
-            if (!prev || prev.length === 0) return prods;
-            return prev.map(p => {
-              const remote = prods.find(rp => rp.id === p.id);
-              return normalizeProductCategory(remote ? { ...remote, ...p } : p);
-            });
+            const merged = mergeProductList(prev, prods);
+            try { localStorage.setItem('viva_products', JSON.stringify(merged)); } catch (e) {}
+            return merged;
           });
         }
-        if (data.categories && data.categories.length > 0) setCategories(data.categories);
+        if (data.categories && data.categories.length > 0) {
+          setCategories(Array.from(new Set(data.categories.map(normalizeCategoryName))));
+        }
         if (data.users && data.users.length > 0) {
           setUsers(prev => {
             const mergedU = mergeUserList(prev, data.users || []);
@@ -370,13 +445,17 @@ export default function App() {
           });
         },
         onProducts: (liveProducts) => {
-          const normalized = (liveProducts || []).map(normalizeProductCategory);
-          setProducts(normalized);
-          try { localStorage.setItem('viva_products', JSON.stringify(normalized)); } catch (e) {}
+          setProducts(prev => {
+            const merged = mergeProductList(prev, liveProducts || []);
+            try { localStorage.setItem('viva_products', JSON.stringify(merged)); } catch (e) {}
+            return merged;
+          });
         },
         onCategories: (liveCategories) => {
-          setCategories(liveCategories);
-          try { localStorage.setItem('viva_categories', JSON.stringify(liveCategories)); } catch (e) {}
+          if (Array.isArray(liveCategories)) {
+            setCategories(Array.from(new Set(liveCategories.map(normalizeCategoryName))));
+            try { localStorage.setItem('viva_categories', JSON.stringify(liveCategories)); } catch (e) {}
+          }
         },
         onUsers: (liveUsers) => {
           setUsers(prev => {
@@ -423,8 +502,16 @@ export default function App() {
                     return merged;
                   });
                 }
-                if (latest.products) setProducts((latest.products || []).map(normalizeProductCategory));
-                if (latest.categories) setCategories(latest.categories);
+                if (latest.products) {
+                  setProducts(prev => {
+                    const merged = mergeProductList(prev, latest.products);
+                    try { localStorage.setItem('viva_products', JSON.stringify(merged)); } catch (e) {}
+                    return merged;
+                  });
+                }
+                if (latest.categories) {
+                  setCategories(Array.from(new Set(latest.categories.map(normalizeCategoryName))));
+                }
                 if (latest.users) {
                   setUsers(prev => {
                     const merged = mergeUserList(prev, latest.users || []);
@@ -460,8 +547,16 @@ export default function App() {
                       return merged;
                     });
                   }
-                  if (latest.products) setProducts((latest.products || []).map(normalizeProductCategory));
-                  if (latest.categories) setCategories(latest.categories);
+                  if (latest.products) {
+                    setProducts(prev => {
+                      const merged = mergeProductList(prev, latest.products);
+                      try { localStorage.setItem('viva_products', JSON.stringify(merged)); } catch (e) {}
+                      return merged;
+                    });
+                  }
+                  if (latest.categories) {
+                    setCategories(Array.from(new Set(latest.categories.map(normalizeCategoryName))));
+                  }
                   if (latest.users) {
                     setUsers(prev => {
                       const merged = mergeUserList(prev, latest.users || []);
@@ -473,7 +568,7 @@ export default function App() {
                 lastVer = version;
               }
             } catch (err) {}
-          }, 4000);
+          }, 3000);
         }
       };
     } catch (e) {
@@ -986,24 +1081,25 @@ export default function App() {
 
   // Products CRUD - Persistência garantida no Banco de Dados
   const handleSaveProduct = async (productData) => {
-    let currentSavedProduct = productData;
+    const finalProduct = {
+      ...productData,
+      id: productData.id || ('prod-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7)),
+      category: normalizeCategoryName(productData.category)
+    };
+
+    removeDeletedProductId(finalProduct.id);
 
     // 1. Atualização imediata no estado e no armazenamento local
     setProducts(prev => {
-      const index = prev.findIndex(p => p.id === productData.id);
-      const next = index !== -1 ? [...prev] : [...prev, productData];
-      if (index !== -1) {
-        next[index] = { ...prev[index], ...productData };
-        currentSavedProduct = next[index];
-      }
-      try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
-      return next;
+      const merged = mergeProductList(prev, [finalProduct]);
+      try { localStorage.setItem('viva_products', JSON.stringify(merged)); } catch (e) {}
+      return merged;
     });
 
     // 2. Persistência no Firebase Cloud Firestore
     if (isFirebaseConfigured()) {
       try {
-        await saveProductToFirestore(currentSavedProduct);
+        await saveProductToFirestore(finalProduct);
       } catch (fbErr) {
         console.warn('Aviso: erro ao salvar produto no Firestore:', fbErr);
       }
@@ -1017,22 +1113,16 @@ export default function App() {
           'Content-Type': 'application/json',
           'X-Client-Id': clientIdRef.current
         },
-        body: JSON.stringify(currentSavedProduct)
+        body: JSON.stringify(finalProduct)
       });
       if (res.ok) {
         const data = await res.json();
-        const savedProd = data.product || currentSavedProduct;
+        const savedProd = data.product || finalProduct;
         
         setProducts(prev => {
-          const index = prev.findIndex(p => p.id === savedProd.id);
-          const next = [...prev];
-          if (index !== -1) {
-            next[index] = savedProd;
-          } else {
-            next.push(savedProd);
-          }
-          try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
-          return next;
+          const merged = mergeProductList(prev, [savedProd]);
+          try { localStorage.setItem('viva_products', JSON.stringify(merged)); } catch (e) {}
+          return merged;
         });
 
         if (isFirebaseConfigured()) {
@@ -1045,6 +1135,7 @@ export default function App() {
   };
 
   const handleDeleteProduct = async (productId) => {
+    addDeletedProductId(productId);
     setProducts(prev => {
       const next = prev.filter(p => p.id !== productId);
       try { localStorage.setItem('viva_products', JSON.stringify(next)); } catch (e) {}
@@ -1568,6 +1659,8 @@ export default function App() {
           setSelectedDate={setSelectedDate}
           saveStatus={saveStatus}
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+          isFirebaseActive={isFirebaseActive}
+          onOpenFirebase={() => setIsFirebaseModalOpen(true)}
         />
 
         {/* Main container: Full Width utilizing all left and right margins, auto-scrolling sidebar menu in sync */}
