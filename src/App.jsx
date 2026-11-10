@@ -32,10 +32,44 @@ import {
 
 const API_BASE = '/api';
 
-// Timestamp-based intelligent merge to prevent overwriting in-flight changes
+// Category Normalizer to fix typos like "BARRA DE PROTÉINAS" -> "BARRA DE PROTEÍNAS"
+function normalizeProductCategory(p) {
+  if (!p) return p;
+  let cat = p.category;
+  if (cat && (cat === 'BARRA DE PROTÉINAS' || cat === 'BARRA DE PROTEINA' || cat === 'BARRAS DE PROTEINA')) {
+    cat = 'BARRA DE PROTEÍNAS';
+  }
+  return { ...p, category: cat };
+}
+
+// Helper to check if an item has actual user-entered data
+function hasRealCountData(item) {
+  if (!item) return false;
+  return (item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '') ||
+         Number(item.outputCount) > 0 ||
+         Number(item.entries) > 0 ||
+         !!item.checked ||
+         (typeof item.observation === 'string' && item.observation.trim() !== '');
+}
+
+// Timestamp-based intelligent merge with protective rules so blank/default items never overwrite real counts
 function mergeItem(localItem, remoteItem) {
   if (!localItem) return remoteItem;
   if (!remoteItem) return localItem;
+
+  const localHas = hasRealCountData(localItem);
+  const remoteHas = hasRealCountData(remoteItem);
+
+  // If local has real user inputs and remote is blank/default, local ALWAYS wins!
+  if (localHas && !remoteHas) {
+    return localItem;
+  }
+  // If remote has real user inputs and local is blank/default, remote wins!
+  if (!localHas && remoteHas) {
+    return remoteItem;
+  }
+
+  // If both have data or both are blank, compare timestamp
   const localTime = new Date(localItem.lastModified || 0).getTime();
   const remoteTime = new Date(remoteItem.lastModified || 0).getTime();
   return remoteTime > localTime ? remoteItem : localItem;
@@ -76,6 +110,32 @@ function mergeCountsHistory(localHistory, remoteHistory) {
   });
 
   return result;
+}
+
+// Intelligent User list merger respecting blacklist of deleted model users
+function mergeUserList(currentLocalUsers, incomingUsers) {
+  let deletedUserIds = [];
+  try {
+    deletedUserIds = JSON.parse(localStorage.getItem('viva_deleted_users') || '[]');
+  } catch (e) {}
+  const deletedSet = new Set(deletedUserIds);
+
+  const map = new Map();
+  (currentLocalUsers || []).forEach(u => {
+    if (u && u.id && !deletedSet.has(u.id)) {
+      map.set(u.id, u);
+    }
+  });
+
+  (incomingUsers || []).forEach(u => {
+    if (u && u.id && !deletedSet.has(u.id)) {
+      if (!map.has(u.id)) {
+        map.set(u.id, u);
+      }
+    }
+  });
+
+  return Array.from(map.values());
 }
 
 export default function App() {
@@ -152,10 +212,14 @@ export default function App() {
         setCountsHistory(JSON.parse(cachedCounts));
       }
       if (cachedProds) {
-        setProducts(JSON.parse(cachedProds));
+        const parsed = JSON.parse(cachedProds);
+        setProducts(Array.isArray(parsed) ? parsed.map(normalizeProductCategory) : []);
       }
       if (cachedCats) setCategories(JSON.parse(cachedCats));
-      if (cachedUsers) setUsers(JSON.parse(cachedUsers));
+      if (cachedUsers) {
+        const parsedU = JSON.parse(cachedUsers);
+        setUsers(mergeUserList([], parsedU));
+      }
       if (cachedSups) {
         try {
           const parsedSups = JSON.parse(cachedSups);
@@ -182,9 +246,9 @@ export default function App() {
         initFirebase();
         const fbData = await loadDataFromFirestore();
         if (fbData && fbData.products && fbData.products.length > 0) {
-          setProducts(fbData.products);
+          setProducts(fbData.products.map(normalizeProductCategory));
           setCategories(fbData.categories || []);
-          setUsers(fbData.users || []);
+          setUsers(prev => mergeUserList(prev, fbData.users || []));
           if (fbData.suppliers && fbData.suppliers.length > 0) {
             setSuppliers(fbData.suppliers);
             try { localStorage.setItem('viva_suppliers', JSON.stringify(fbData.suppliers)); } catch (e) {}
@@ -218,10 +282,24 @@ export default function App() {
         const res = await fetch(`${API_BASE}/data`);
         if (!res.ok) throw new Error('Falha ao conectar com servidor');
         const data = await res.json();
-        const prods = data.products || [];
-        if (prods.length > 0) setProducts(prods);
+        const prods = (data.products || []).map(normalizeProductCategory);
+        if (prods.length > 0) {
+          setProducts(prev => {
+            if (!prev || prev.length === 0) return prods;
+            return prev.map(p => {
+              const remote = prods.find(rp => rp.id === p.id);
+              return normalizeProductCategory(remote ? { ...remote, ...p } : p);
+            });
+          });
+        }
         if (data.categories && data.categories.length > 0) setCategories(data.categories);
-        if (data.users && data.users.length > 0) setUsers(data.users);
+        if (data.users && data.users.length > 0) {
+          setUsers(prev => {
+            const mergedU = mergeUserList(prev, data.users || []);
+            try { localStorage.setItem('viva_users', JSON.stringify(mergedU)); } catch (e) {}
+            return mergedU;
+          });
+        }
         if (data.suppliers && data.suppliers.length > 0) {
           setSuppliers(data.suppliers);
           try { localStorage.setItem('viva_suppliers', JSON.stringify(data.suppliers)); } catch (e) {}
@@ -246,6 +324,18 @@ export default function App() {
           try {
             localStorage.setItem('viva_counts_history', JSON.stringify(merged));
           } catch (e) {}
+
+          // If local has real counts and server is empty (e.g. server restarted), sync to server
+          const hasLocalCounts = Object.keys(merged.loja || {}).length > 0 || Object.keys(merged.deposito || {}).length > 0;
+          const serverEmpty = Object.keys(normalizedCounts.loja || {}).length === 0 && Object.keys(normalizedCounts.deposito || {}).length === 0;
+          if (hasLocalCounts && serverEmpty) {
+            fetch(`${API_BASE}/counts/sync-all`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'X-Client-Id': clientIdRef.current },
+              body: JSON.stringify({ counts: merged })
+            }).catch(() => {});
+          }
+
           return merged;
         });
 
@@ -280,16 +370,20 @@ export default function App() {
           });
         },
         onProducts: (liveProducts) => {
-          setProducts(liveProducts);
-          try { localStorage.setItem('viva_products', JSON.stringify(liveProducts)); } catch (e) {}
+          const normalized = (liveProducts || []).map(normalizeProductCategory);
+          setProducts(normalized);
+          try { localStorage.setItem('viva_products', JSON.stringify(normalized)); } catch (e) {}
         },
         onCategories: (liveCategories) => {
           setCategories(liveCategories);
           try { localStorage.setItem('viva_categories', JSON.stringify(liveCategories)); } catch (e) {}
         },
         onUsers: (liveUsers) => {
-          setUsers(liveUsers);
-          try { localStorage.setItem('viva_users', JSON.stringify(liveUsers)); } catch (e) {}
+          setUsers(prev => {
+            const merged = mergeUserList(prev, liveUsers || []);
+            try { localStorage.setItem('viva_users', JSON.stringify(merged)); } catch (e) {}
+            return merged;
+          });
         },
         onSuppliers: (liveSuppliers) => {
           setSuppliers(liveSuppliers);
@@ -329,9 +423,15 @@ export default function App() {
                     return merged;
                   });
                 }
-                if (latest.products) setProducts(latest.products);
+                if (latest.products) setProducts((latest.products || []).map(normalizeProductCategory));
                 if (latest.categories) setCategories(latest.categories);
-                if (latest.users) setUsers(latest.users);
+                if (latest.users) {
+                  setUsers(prev => {
+                    const merged = mergeUserList(prev, latest.users || []);
+                    try { localStorage.setItem('viva_users', JSON.stringify(merged)); } catch (e) {}
+                    return merged;
+                  });
+                }
                 if (latest.suppliers) setSuppliers(latest.suppliers);
               })
               .catch(() => {});
@@ -360,9 +460,15 @@ export default function App() {
                       return merged;
                     });
                   }
-                  if (latest.products) setProducts(latest.products);
+                  if (latest.products) setProducts((latest.products || []).map(normalizeProductCategory));
                   if (latest.categories) setCategories(latest.categories);
-                  if (latest.users) setUsers(latest.users);
+                  if (latest.users) {
+                    setUsers(prev => {
+                      const merged = mergeUserList(prev, latest.users || []);
+                      try { localStorage.setItem('viva_users', JSON.stringify(merged)); } catch (e) {}
+                      return merged;
+                    });
+                  }
                 }
                 lastVer = version;
               }
@@ -387,36 +493,44 @@ export default function App() {
       .filter(d => d < targetDateStr)
       .sort((a, b) => b.localeCompare(a)); // Descending: closest previous day first
 
-    if (priorDates.length > 0) {
-      const prevDate = priorDates[0];
+    for (const prevDate of priorDates) {
       const prevItem = locCounts[prevDate]?.items?.[productId];
       if (prevItem) {
         if (prevItem.countedStock !== null && prevItem.countedStock !== undefined && prevItem.countedStock !== '') {
           return Number(prevItem.countedStock);
         }
-        // Fallback to Estoque Geral of that previous day
-        return (Number(prevItem.currentStock) || 0) + (Number(prevItem.entries) || 0) - (Number(prevItem.outputCount) || 0);
+        if (location === 'deposito') {
+          const finalDep = (Number(prevItem.currentStock) || 0) + (Number(prevItem.entries) || 0);
+          if (finalDep > 0) return finalDep;
+        } else {
+          const cur = Number(prevItem.currentStock) || 0;
+          const ent = Number(prevItem.entries) || 0;
+          const out = Number(prevItem.outputCount) || 0;
+          if (cur > 0 || ent > 0 || out > 0) {
+            return Math.max(0, cur + ent - out);
+          }
+        }
       }
     }
     return defaultVal;
   }, [countsHistory]);
 
-  // Ensure count session exists for current location & selectedDate
+  // Ensure count session exists for current location & selectedDate and carries over previous counted stock
   useEffect(() => {
     if (!loading && products.length > 0) {
       const locCounts = countsHistory[currentLocation] || {};
-      if (!locCounts[selectedDate]) {
-        const defaultUser = users.find(u => u.id === currentUserId) || users[0];
-        const newItems = {};
-        const mult = currentLocation === 'deposito' ? 2.5 : 1;
+      const currentSess = locCounts[selectedDate];
+      const defaultUser = users.find(u => u.id === currentUserId) || users[0];
+      const mult = currentLocation === 'deposito' ? 2.5 : 1;
 
+      if (!currentSess) {
+        const newItems = {};
         products.forEach(p => {
-          // Chain rule: initial stock of today is the counted stock of yesterday
           const initialStock = getPrevCountedStock(
             currentLocation,
             selectedDate,
             p.id,
-            Math.round(p.currentStock * mult)
+            Math.round((p.currentStock || 0) * mult)
           );
 
           newItems[p.id] = {
@@ -429,6 +543,7 @@ export default function App() {
             checked: false,
             checkedAt: null,
             countedBy: defaultUser ? defaultUser.name : 'Conferente',
+            observation: '',
             lastModified: new Date().toISOString()
           };
         });
@@ -440,15 +555,63 @@ export default function App() {
           items: newItems
         };
 
-        setCountsHistory(prev => ({
-          ...prev,
-          [currentLocation]: {
-            ...(prev[currentLocation] || {}),
-            [selectedDate]: newSession
-          }
-        }));
+        setCountsHistory(prev => {
+          const next = {
+            ...prev,
+            [currentLocation]: {
+              ...(prev[currentLocation] || {}),
+              [selectedDate]: newSession
+            }
+          };
+          try { localStorage.setItem('viva_counts_history', JSON.stringify(next)); } catch (e) {}
+          return next;
+        });
 
-        fetch(`${API_BASE}/counts/${selectedDate}?location=${currentLocation}`).catch(console.error);
+        fetch(`${API_BASE}/counts/${selectedDate}?location=${currentLocation}`).catch(() => {});
+      } else {
+        // If session exists, but some items have currentStock === 0 and no counts yet, refresh from previous day
+        let needsStockRefresh = false;
+        const updatedItems = { ...currentSess.items };
+
+        products.forEach(p => {
+          const it = updatedItems[p.id];
+          const prevStock = getPrevCountedStock(currentLocation, selectedDate, p.id, null);
+          if (prevStock !== null && prevStock > 0) {
+            if (!it || (!hasRealCountData(it) && (!it.currentStock || Number(it.currentStock) === 0))) {
+              updatedItems[p.id] = {
+                ...(it || {}),
+                productId: p.id,
+                currentStock: prevStock,
+                entries: it ? it.entries : 0,
+                outputCount: it ? it.outputCount : 0,
+                countedStock: it ? it.countedStock : null,
+                difference: it ? it.difference : 0,
+                checked: it ? it.checked : false,
+                countedBy: it?.countedBy || defaultUser?.name || 'Conferente',
+                observation: it?.observation || '',
+                lastModified: new Date().toISOString()
+              };
+              needsStockRefresh = true;
+            }
+          }
+        });
+
+        if (needsStockRefresh) {
+          setCountsHistory(prev => {
+            const next = {
+              ...prev,
+              [currentLocation]: {
+                ...(prev[currentLocation] || {}),
+                [selectedDate]: {
+                  ...currentSess,
+                  items: updatedItems
+                }
+              }
+            };
+            try { localStorage.setItem('viva_counts_history', JSON.stringify(next)); } catch (e) {}
+            return next;
+          });
+        }
       }
     }
   }, [selectedDate, currentLocation, loading, products, users, currentUserId, countsHistory, getPrevCountedStock]);
@@ -958,8 +1121,10 @@ export default function App() {
 
   const handleAddUser = async (userData) => {
     const tempUser = { id: 'usr-' + Date.now(), name: userData.name };
+    let updatedUsers = [];
     setUsers(prev => {
       const next = [...prev, tempUser];
+      updatedUsers = next;
       try { localStorage.setItem('viva_users', JSON.stringify(next)); } catch (e) {}
       return next;
     });
@@ -978,10 +1143,17 @@ export default function App() {
       const savedUser = data.user || tempUser;
       setUsers(prev => {
         const next = prev.map(u => u.id === tempUser.id ? savedUser : u);
+        updatedUsers = next;
         try { localStorage.setItem('viva_users', JSON.stringify(next)); } catch (e) {}
         return next;
       });
       setCurrentUserId(savedUser.id);
+
+      fetch(`${API_BASE}/users/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Client-Id': clientIdRef.current },
+        body: JSON.stringify({ users: updatedUsers })
+      }).catch(() => {});
 
       if (isFirebaseConfigured()) {
         saveUserToFirestore(savedUser);
@@ -995,8 +1167,19 @@ export default function App() {
   };
 
   const handleDeleteUser = async (userId) => {
+    // Record deleted user in persistent blacklist so server cold restart NEVER restores model user
+    try {
+      const deletedList = JSON.parse(localStorage.getItem('viva_deleted_users') || '[]');
+      if (!deletedList.includes(userId)) {
+        deletedList.push(userId);
+        localStorage.setItem('viva_deleted_users', JSON.stringify(deletedList));
+      }
+    } catch (e) {}
+
+    let remainingUsers = [];
     setUsers(prev => {
       const remaining = prev.filter(u => u.id !== userId);
+      remainingUsers = remaining;
       try { localStorage.setItem('viva_users', JSON.stringify(remaining)); } catch (e) {}
       if (currentUserId === userId && remaining.length > 0) {
         setCurrentUserId(remaining[0].id);
@@ -1009,6 +1192,11 @@ export default function App() {
         method: 'DELETE',
         headers: { 'X-Client-Id': clientIdRef.current }
       });
+      fetch(`${API_BASE}/users/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Client-Id': clientIdRef.current },
+        body: JSON.stringify({ users: remainingUsers })
+      }).catch(() => {});
     } catch (err) {
       console.error('Erro ao excluir usuário no backend:', err);
     }

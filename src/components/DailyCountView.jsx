@@ -17,8 +17,10 @@ import {
   UserCheck,
   Edit2,
   X,
-  MessageSquare
+  MessageSquare,
+  Calendar
 } from 'lucide-react';
+import { formatDateBR } from '../utils/formatters';
 
 export default function DailyCountView({
   selectedDate,
@@ -185,7 +187,11 @@ export default function DailyCountView({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-semibold">
+        <div className="flex items-center flex-wrap gap-2 text-xs font-semibold">
+          <span className="bg-white/90 text-slate-800 px-2.5 py-1 rounded-md border border-slate-200 shadow-xs flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-blue-600" />
+            <span>Data da Contagem: <strong>{formatDateBR(selectedDate)}</strong></span>
+          </span>
           <span className="bg-white/80 px-2.5 py-1 rounded-md border border-black/5 shadow-xs">
             {isDeposito
               ? `${stats.totalItems} produtos cadastrados (${stats.totalStock} un em estoque)`
@@ -538,13 +544,16 @@ export default function DailyCountView({
                               />
                             </div>
                             <div className="flex items-center gap-1.5 pt-0.5">
-                              <select
-                                value={inlineCategory}
-                                onChange={(e) => setInlineCategory(e.target.value)}
-                                className="text-[11px] border border-blue-300 rounded px-1.5 py-1 bg-white font-medium flex-1 focus:outline-none"
-                              >
-                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                              </select>
+                                <select
+                                  value={inlineCategory}
+                                  onChange={(e) => setInlineCategory(e.target.value)}
+                                  className="text-[11px] border border-blue-300 rounded px-1.5 py-1 bg-white font-medium flex-1 focus:outline-none"
+                                >
+                                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                  {inlineCategory && !categories.includes(inlineCategory) && (
+                                    <option value={inlineCategory}>{inlineCategory}</option>
+                                  )}
+                                </select>
                               <button
                                 type="button"
                                 onClick={() => {
@@ -591,7 +600,11 @@ export default function DailyCountView({
                               onClick={() => {
                                 setEditingInlineProdId(product.id);
                                 setInlineName(product.name);
-                                setInlineCategory(product.category);
+                                const matchedCat = categories.find(c => 
+                                  c.localeCompare(product.category, undefined, { sensitivity: 'accent' }) === 0 ||
+                                  c.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() === (product.category || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+                                );
+                                setInlineCategory(matchedCat || product.category);
                               }}
                               className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer shrink-0 ml-2"
                               title="Editar este item exatamente aqui"

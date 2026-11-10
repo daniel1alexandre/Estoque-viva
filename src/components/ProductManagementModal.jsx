@@ -53,7 +53,11 @@ export default function ProductManagementModal({
     setIsCreatingNew(false);
     setEditingProductId(prod.id);
     setEditName(prod.name);
-    setEditCategory(prod.category);
+    const matchedCat = categories.find(c => 
+      c.localeCompare(prod.category, undefined, { sensitivity: 'accent' }) === 0 ||
+      c.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase() === (prod.category || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+    );
+    setEditCategory(matchedCat || prod.category);
     setEditUnit(prod.unit || 'UN');
     setEditMinStock(String(prod.minStock || 0));
     setEditStock(String(prod.currentStock || 0));
@@ -411,6 +415,9 @@ export default function ProductManagementModal({
                             {categories.map(c => (
                               <option key={c} value={c}>{c}</option>
                             ))}
+                            {editCategory && !categories.includes(editCategory) && (
+                              <option value={editCategory}>{editCategory}</option>
+                            )}
                           </select>
                         </td>
 

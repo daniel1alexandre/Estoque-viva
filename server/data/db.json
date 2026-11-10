@@ -454,7 +454,7 @@
       "id": "p-prot-1",
       "code": "PROT-001",
       "name": "Protwins Creme de Avelã",
-      "category": "BARRA DE PROTÉINAS",
+      "category": "BARRA DE PROTEÍNAS",
       "unit": "UN",
       "minStock": 20,
       "currentStock": 0
@@ -463,7 +463,7 @@
       "id": "p-prot-2",
       "code": "PROT-002",
       "name": "Protwins Morango",
-      "category": "BARRA DE PROTÉINAS",
+      "category": "BARRA DE PROTEÍNAS",
       "unit": "UN",
       "minStock": 20,
       "currentStock": 0
@@ -472,7 +472,7 @@
       "id": "p-prot-3",
       "code": "PROT-003",
       "name": "Protwins Cookies & Cream",
-      "category": "BARRA DE PROTÉINAS",
+      "category": "BARRA DE PROTEÍNAS",
       "unit": "UN",
       "minStock": 20,
       "currentStock": 0
@@ -481,7 +481,7 @@
       "id": "p-prot-4",
       "code": "PROT-004",
       "name": "Go! Recovery Gel Guaraná com Açai",
-      "category": "BARRA DE PROTÉINAS",
+      "category": "BARRA DE PROTEÍNAS",
       "unit": "SACHÊ",
       "minStock": 20,
       "currentStock": 0

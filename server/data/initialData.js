@@ -117,11 +117,11 @@ export const initialProducts = [
   { id: 'p-doc-31', code: 'DOC-031', name: 'Pipoca Doce Ninho', category: 'DOCES', unit: 'PCT', minStock: 15, currentStock: 0 },
   { id: 'p-doc-32', code: 'DOC-032', name: 'It´s Brownie', category: 'DOCES', unit: 'UN', minStock: 15, currentStock: 0 },
 
-  // --- BARRA DE PROTÉINAS ---
-  { id: 'p-prot-1', code: 'PROT-001', name: 'Protwins Creme de Avelã', category: 'BARRA DE PROTÉINAS', unit: 'UN', minStock: 20, currentStock: 0 },
-  { id: 'p-prot-2', code: 'PROT-002', name: 'Protwins Morango', category: 'BARRA DE PROTÉINAS', unit: 'UN', minStock: 20, currentStock: 0 },
-  { id: 'p-prot-3', code: 'PROT-003', name: 'Protwins Cookies & Cream', category: 'BARRA DE PROTÉINAS', unit: 'UN', minStock: 20, currentStock: 0 },
-  { id: 'p-prot-4', code: 'PROT-004', name: 'Go! Recovery Gel Guaraná com Açai', category: 'BARRA DE PROTÉINAS', unit: 'SACHÊ', minStock: 20, currentStock: 0 },
+  // --- BARRA DE PROTEÍNAS ---
+  { id: 'p-prot-1', code: 'PROT-001', name: 'Protwins Creme de Avelã', category: 'BARRA DE PROTEÍNAS', unit: 'UN', minStock: 20, currentStock: 0 },
+  { id: 'p-prot-2', code: 'PROT-002', name: 'Protwins Morango', category: 'BARRA DE PROTEÍNAS', unit: 'UN', minStock: 20, currentStock: 0 },
+  { id: 'p-prot-3', code: 'PROT-003', name: 'Protwins Cookies & Cream', category: 'BARRA DE PROTEÍNAS', unit: 'UN', minStock: 20, currentStock: 0 },
+  { id: 'p-prot-4', code: 'PROT-004', name: 'Go! Recovery Gel Guaraná com Açai', category: 'BARRA DE PROTEÍNAS', unit: 'SACHÊ', minStock: 20, currentStock: 0 },
 
   // --- CHIPS ---
   { id: 'p-chip-1', code: 'CHIP-001', name: 'Chips Lays Cebola', category: 'CHIPS', unit: 'PCT', minStock: 15, currentStock: 0 },

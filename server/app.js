@@ -215,7 +215,7 @@ app.get('/api/counts/:date', (req, res) => {
         checkedAt: null,
         countedBy: db.users[0]?.name || 'Conferente',
         observation: '',
-        lastModified: new Date().toISOString()
+        lastModified: '1970-01-01T00:00:00.000Z'
       };
     });
 
@@ -225,10 +225,27 @@ app.get('/api/counts/:date', (req, res) => {
       defaultUserId: db.users[0]?.id || '',
       items
     };
-    saveDatabase(db);
+    // Don't broadcast SSE on read requests
   }
 
   res.json(db.counts[location][date]);
+});
+
+// Bulk sync counts from client to server (protects against Vercel serverless cold-boot data loss)
+app.post('/api/counts/sync-all', (req, res) => {
+  const { counts } = req.body;
+  const clientId = req.headers['x-client-id'];
+  if (counts && typeof counts === 'object') {
+    if (!db.counts) db.counts = { loja: {}, deposito: {} };
+    if (counts.loja) {
+      db.counts.loja = { ...(db.counts.loja || {}), ...counts.loja };
+    }
+    if (counts.deposito) {
+      db.counts.deposito = { ...(db.counts.deposito || {}), ...counts.deposito };
+    }
+    saveDatabase(db, clientId);
+  }
+  res.json({ success: true });
 });
 
 // Auto-save item count
@@ -486,6 +503,17 @@ app.delete('/api/users/:id', (req, res) => {
   db.users = db.users.filter(u => u.id !== id);
   saveDatabase(db, clientId);
   res.json({ success: true, message: 'Usuário excluído com sucesso' });
+});
+
+// Bulk sync users from client to server (protects against Vercel serverless cold-boot data loss)
+app.post('/api/users/sync', (req, res) => {
+  const { users } = req.body;
+  const clientId = req.headers['x-client-id'];
+  if (Array.isArray(users)) {
+    db.users = users;
+    saveDatabase(db, clientId);
+  }
+  res.json({ success: true, users: db.users });
 });
 
 // Suppliers CRUD

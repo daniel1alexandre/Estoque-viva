@@ -27,38 +27,63 @@ export default function GeneralStockView({
   const [selectedCategory, setSelectedCategory] = useState('TODAS');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'critical', 'normal'
 
-  // Extract sessions for selected date
-  const lojaSession = counts?.loja?.[selectedDate]?.items || {};
-  const depositoSession = counts?.deposito?.[selectedDate]?.items || {};
-
-  // Compute detailed inventory per product
+  // Compute detailed inventory per product using selected date or latest available count
   const inventoryList = useMemo(() => {
-    return products.map(product => {
-      // 1. Loja Stock Calculation
-      const lojaItem = lojaSession[product.id];
-      let estoqueLoja = product.currentStock || 0;
-      if (lojaItem) {
-        const hasCount = lojaItem.countedStock !== null && lojaItem.countedStock !== undefined && lojaItem.countedStock !== '';
-        if (hasCount) {
-          estoqueLoja = Number(lojaItem.countedStock);
+    const locLoja = counts?.loja || {};
+    const locDeposito = counts?.deposito || {};
+
+    const getStockForProduct = (loc, prodId, fallbackStock) => {
+      const locCounts = loc === 'deposito' ? locDeposito : locLoja;
+
+      // 1. Check selectedDate first
+      const itemOnDate = locCounts[selectedDate]?.items?.[prodId];
+      if (itemOnDate) {
+        if (loc === 'loja') {
+          const hasCount = itemOnDate.countedStock !== null && itemOnDate.countedStock !== undefined && itemOnDate.countedStock !== '';
+          if (hasCount) return Number(itemOnDate.countedStock);
+          const cur = Number(itemOnDate.currentStock ?? fallbackStock) || 0;
+          const ent = Number(itemOnDate.entries) || 0;
+          const diff = Math.abs(Number(itemOnDate.difference) || 0);
+          if (cur > 0 || ent > 0) return Math.max(0, cur + ent - diff);
         } else {
-          const cur = Number(lojaItem.currentStock ?? product.currentStock) || 0;
-          const ent = Number(lojaItem.entries) || 0;
-          const diff = Math.abs(Number(lojaItem.difference) || 0);
-          estoqueLoja = Math.max(0, cur + ent - diff);
+          const baseDep = Number(itemOnDate.currentStock ?? fallbackStock) || 0;
+          const entriesDep = Number(itemOnDate.entries) || 0;
+          if (baseDep > 0 || entriesDep > 0) return baseDep + entriesDep;
         }
       }
 
-      // 2. Depósito Stock Calculation (Base Stock + Entradas do dia)
-      const depItem = depositoSession[product.id];
-      let estoqueDeposito = 0;
-      if (depItem) {
-        const baseDep = Number(depItem.currentStock ?? product.currentStock) || 0;
-        const entriesDep = Number(depItem.entries) || 0;
-        estoqueDeposito = baseDep + entriesDep;
-      } else {
-        estoqueDeposito = product.currentStock || 0;
+      // 2. If no count on selectedDate, search prior dates (closest first)
+      const priorDates = Object.keys(locCounts)
+        .filter(d => d < selectedDate)
+        .sort((a, b) => b.localeCompare(a));
+
+      for (const d of priorDates) {
+        const priorItem = locCounts[d]?.items?.[prodId];
+        if (priorItem) {
+          if (loc === 'loja') {
+            if (priorItem.countedStock !== null && priorItem.countedStock !== undefined && priorItem.countedStock !== '') {
+              return Number(priorItem.countedStock);
+            }
+            const cur = Number(priorItem.currentStock) || 0;
+            const ent = Number(priorItem.entries) || 0;
+            if (cur > 0 || ent > 0) return cur + ent;
+          } else {
+            const base = Number(priorItem.currentStock) || 0;
+            const ent = Number(priorItem.entries) || 0;
+            if (base > 0 || ent > 0) return base + ent;
+          }
+        }
       }
+
+      return Number(fallbackStock) || 0;
+    };
+
+    return products.map(product => {
+      // 1. Loja Stock Calculation
+      const estoqueLoja = getStockForProduct('loja', product.id, product.currentStock || 0);
+
+      // 2. Depósito Stock Calculation
+      const estoqueDeposito = getStockForProduct('deposito', product.id, product.currentStock || 0);
 
       // 3. Estoque Geral (Loja + Depósito)
       const estoqueGeral = estoqueLoja + estoqueDeposito;
@@ -84,7 +109,7 @@ export default function GeneralStockView({
       if (catCompare !== 0) return catCompare;
       return (a.product.name || '').localeCompare(b.product.name || '', 'pt-BR', { sensitivity: 'base' });
     });
-  }, [products, lojaSession, depositoSession]);
+  }, [products, counts, selectedDate]);
 
   // Overall Statistics
   const stats = useMemo(() => {

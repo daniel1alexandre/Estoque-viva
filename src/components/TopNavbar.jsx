@@ -67,6 +67,48 @@ export default function TopNavbar({
 
         {/* Right: Date Picker, Auto-save status, Live Sync indicator, Active User */}
         <div className="flex items-center flex-wrap gap-2.5 justify-end">
+          {/* Quick Date Switcher: Ontem / Hoje */}
+          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px] font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                const y = new Date();
+                y.setDate(y.getDate() - 1);
+                const yStr = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+                setSelectedDate(yStr);
+              }}
+              className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
+                (() => {
+                  const y = new Date();
+                  y.setDate(y.getDate() - 1);
+                  const yStr = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+                  return selectedDate === yStr ? 'bg-white text-indigo-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900';
+                })()
+              }`}
+              title="Ir para a contagem de ontem"
+            >
+              Ontem
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date();
+                const tStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                setSelectedDate(tStr);
+              }}
+              className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
+                (() => {
+                  const now = new Date();
+                  const tStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                  return selectedDate === tStr ? 'bg-white text-blue-700 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900';
+                })()
+              }`}
+              title="Ir para a contagem de hoje"
+            >
+              Hoje
+            </button>
+          </div>
+
           {/* Date Selector */}
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 shadow-2xs">
             <Calendar className="w-3.5 h-3.5 text-slate-500" />
