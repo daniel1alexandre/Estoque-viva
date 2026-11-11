@@ -13,7 +13,8 @@ import {
   BarChart3, 
   FileText,
   Cloud,
-  CloudOff
+  CloudOff,
+  Eye
 } from 'lucide-react';
 import { formatDateBR } from '../utils/formatters';
 
@@ -31,6 +32,7 @@ export default function TopNavbar({
     count: { title: 'Controle de Estoque - Loja / Frente', subtitle: 'Conferência física diária e apuração de saídas', icon: Store, color: 'text-blue-600' },
     deposito: { title: 'Controle de Estoque - Depósito Central', subtitle: 'Gestão de entradas e estoque de retaguarda', icon: Warehouse, color: 'text-amber-600' },
     general_stock: { title: 'Estoque Geral Integrado', subtitle: 'Consolidação de Loja + Depósito com monitoramento de nível mínimo', icon: Boxes, color: 'text-indigo-600' },
+    visualization: { title: 'Visualização dos Últimos 7 Dias', subtitle: 'Histórico, evolução diária e conferências dos últimos 7 dias', icon: Eye, color: 'text-indigo-600' },
     orders: { title: 'Gestão de Pedidos de Compra', subtitle: 'Reposição agrupada por segmento e fornecedor', icon: ShoppingCart, color: 'text-orange-600' },
     suppliers: { title: 'Gerenciador de Fornecedores', subtitle: 'Vínculos de produtos e contatos comerciais', icon: Building2, color: 'text-orange-600' },
     dashboard: { title: 'Dashboard de Saídas e Vendas', subtitle: 'Análise de divergências e produtos mais vendidos', icon: BarChart3, color: 'text-blue-600' },

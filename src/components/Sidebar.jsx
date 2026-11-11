@@ -14,7 +14,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   ShieldAlert,
-  UserCheck
+  UserCheck,
+  Eye
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -69,6 +70,14 @@ export default function Sidebar({
         ? 'bg-rose-600 text-white ring-2 ring-rose-400 shadow-sm animate-pulse font-bold'
         : 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 font-bold',
       badgeColor: hasLowGeneralStock ? 'bg-white text-rose-700 font-black animate-pulse' : 'bg-indigo-500/30 text-white'
+    },
+    {
+      id: 'visualization',
+      label: 'Visualização',
+      icon: Eye,
+      badge: '7 Dias',
+      activeColor: 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 font-bold',
+      badgeColor: 'bg-indigo-400/30 text-indigo-100'
     },
     {
       id: 'orders',

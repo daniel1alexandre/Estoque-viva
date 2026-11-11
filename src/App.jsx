@@ -5,6 +5,7 @@ import DailyCountView from './components/DailyCountView';
 import DashboardView from './components/DashboardView';
 import OrdersView from './components/OrdersView';
 import GeneralStockView from './components/GeneralStockView';
+import VisualizationView from './components/VisualizationView';
 import ReportsView from './components/ReportsView';
 import ProductManagementModal from './components/ProductManagementModal';
 import UserManagementModal from './components/UserManagementModal';
@@ -1705,6 +1706,16 @@ export default function App() {
             counts={countsHistory}
             selectedDate={selectedDate}
             onNavigateToOrders={() => setActiveTab('orders')}
+          />
+        ) : activeTab === 'visualization' ? (
+          <VisualizationView
+            products={sortedProducts}
+            categories={sortedCategories}
+            counts={countsHistory}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            onNavigateToTab={(tab) => setActiveTab(tab)}
+            users={users}
           />
         ) : activeTab === 'orders' ? (
           <OrdersView
