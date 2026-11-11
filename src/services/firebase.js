@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, deleteApp } from 'firebase/app';
 import { 
   getFirestore, 
   doc, 
@@ -95,15 +95,24 @@ export function saveFirebaseConfig(config) {
 let appInstance = null;
 let dbInstance = null;
 
-export function initFirebase() {
+export function initFirebase(force = false) {
   const config = getFirebaseConfig();
   if (!config.apiKey || !config.projectId) {
+    appInstance = null;
+    dbInstance = null;
     return null;
   }
 
   try {
-    if (getApps().length > 0) {
-      appInstance = getApp();
+    const apps = getApps();
+    const defaultApp = apps.find(a => a.name === '[DEFAULT]');
+    if (defaultApp) {
+      if (force || defaultApp.options.projectId !== config.projectId || defaultApp.options.apiKey !== config.apiKey) {
+        deleteApp(defaultApp).catch(() => {});
+        appInstance = initializeApp(config);
+      } else {
+        appInstance = defaultApp;
+      }
     } else {
       appInstance = initializeApp(config);
     }
@@ -125,6 +134,57 @@ export function getDb() {
     return initFirebase();
   }
   return dbInstance;
+}
+
+// Live diagnostics tester to verify Firebase credentials, Firestore connection, and Security Rules
+export async function testFirebaseConnection(customConfig = null) {
+  const config = customConfig || getFirebaseConfig();
+  if (!config.apiKey || !config.projectId) {
+    return { success: false, message: 'API Key ou Project ID não informados.' };
+  }
+
+  const testAppName = 'test_app_' + Date.now();
+  let testApp = null;
+  try {
+    testApp = initializeApp(config, testAppName);
+    const testDb = getFirestore(testApp);
+
+    // Try a ping write & read in settings/ping
+    const pingRef = doc(testDb, 'settings', 'ping');
+    const now = new Date().toISOString();
+    await setDoc(pingRef, { ping: now, testedBy: 'connection_tester' }, { merge: true });
+    const snap = await getDoc(pingRef);
+
+    try {
+      await deleteApp(testApp);
+    } catch (e) {}
+
+    if (snap.exists() && snap.data().ping === now) {
+      return { 
+        success: true, 
+        message: 'Conexão em nuvem com o Firebase Firestore validada com sucesso! Leitura e gravação operacionais em tempo real.' 
+      };
+    } else {
+      return { 
+        success: false, 
+        message: 'Não foi possível confirmar a gravação no Firestore.' 
+      };
+    }
+  } catch (err) {
+    if (testApp) {
+      try { await deleteApp(testApp); } catch (e) {}
+    }
+    console.error('Erro no teste do Firebase:', err);
+    let userMsg = err.message || 'Erro ao conectar ao Firebase.';
+    if (err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission'))) {
+      userMsg = 'Permissão negada! As Regras de Segurança (Rules) do Cloud Firestore no Firebase Console precisam permitir leitura e gravação (veja o modelo abaixo).';
+    } else if (err.code === 'unavailable' || (err.message && err.message.toLowerCase().includes('offline'))) {
+      userMsg = 'O banco de dados Firestore não respondeu. Certifique-se de ter criado o banco "Cloud Firestore" no Firebase Console.';
+    } else if (err.code && err.code.includes('api-key')) {
+      userMsg = 'A chave API Key informada é inválida. Verifique a chave nas Configurações do Projeto no Firebase.';
+    }
+    return { success: false, message: userMsg, error: err };
+  }
 }
 
 // ----------------- FIRESTORE DATA METHODS -----------------
@@ -353,26 +413,26 @@ export async function seedDataToFirestore(products, categories, users, counts, s
 
     // Save categories metadata
     const metaRef = doc(db, 'settings', 'metadata');
-    batch.set(metaRef, { categories, updatedAt: new Date().toISOString() });
+    batch.set(metaRef, sanitizeFirestoreData({ categories, updatedAt: new Date().toISOString() }));
 
     // Save users
     users.forEach(u => {
       const uRef = doc(db, 'users', u.id);
-      batch.set(uRef, { id: u.id, name: u.name });
+      batch.set(uRef, sanitizeFirestoreData({ id: u.id, name: u.name }));
     });
 
     // Save suppliers
     if (suppliers && Array.isArray(suppliers) && suppliers.length > 0) {
       suppliers.forEach(s => {
         const sRef = doc(db, 'suppliers', s.id);
-        batch.set(sRef, s);
+        batch.set(sRef, sanitizeFirestoreData(s));
       });
     }
 
     // Save products (in chunks if needed)
     products.forEach(p => {
       const pRef = doc(db, 'products', p.id);
-      batch.set(pRef, p);
+      batch.set(pRef, sanitizeFirestoreData(p));
     });
 
     await batch.commit();
@@ -382,12 +442,12 @@ export async function seedDataToFirestore(products, categories, users, counts, s
       for (const [date, session] of Object.entries(sessions || {})) {
         if (session && session.items) {
           const cRef = doc(db, 'counts', `${location}_${date}`);
-          await setDoc(cRef, {
+          await setDoc(cRef, sanitizeFirestoreData({
             location,
             date,
             items: session.items,
             updatedAt: new Date().toISOString()
-          });
+          }), { merge: true });
         }
       }
     }

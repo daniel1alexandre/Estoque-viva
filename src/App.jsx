@@ -1804,6 +1804,10 @@ export default function App() {
         suppliers={suppliers}
         countsHistory={countsHistory}
         onReloadData={loadData}
+        onConfigSaved={() => {
+          setIsFirebaseActive(true);
+          loadData();
+        }}
       />
       </div>
     </div>

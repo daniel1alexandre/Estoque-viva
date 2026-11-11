@@ -19,7 +19,8 @@ import {
   saveFirebaseConfig, 
   isFirebaseConfigured, 
   initFirebase, 
-  seedDataToFirestore 
+  seedDataToFirestore,
+  testFirebaseConnection
 } from '../services/firebase';
 
 export default function FirebaseConfigModal({
@@ -30,7 +31,8 @@ export default function FirebaseConfigModal({
   users,
   suppliers = [],
   countsHistory,
-  onReloadData
+  onReloadData,
+  onConfigSaved
 }) {
   const [configText, setConfigText] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -42,8 +44,10 @@ export default function FirebaseConfigModal({
   
   const [statusMessage, setStatusMessage] = useState(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedRules, setCopiedRules] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -92,7 +96,47 @@ export default function FirebaseConfigModal({
     }
   };
 
-  const handleSave = () => {
+  const firestoreRulesText = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}`;
+
+  const handleCopyRules = () => {
+    navigator.clipboard.writeText(firestoreRulesText);
+    setCopiedRules(true);
+    setTimeout(() => setCopiedRules(false), 4000);
+  };
+
+  const handleTestConnection = async () => {
+    if (!apiKey.trim() || !projectId.trim()) {
+      setStatusMessage({ type: 'error', text: 'Preencha a API Key e o Project ID antes de testar a conexão.' });
+      return;
+    }
+    const cfg = {
+      apiKey: apiKey.trim(),
+      projectId: projectId.trim(),
+      authDomain: authDomain.trim(),
+      storageBucket: storageBucket.trim(),
+      messagingSenderId: messagingSenderId.trim(),
+      appId: appId.trim()
+    };
+    setIsTesting(true);
+    setStatusMessage({ type: 'info', text: 'Testando conexão em tempo real com o Cloud Firestore...' });
+    const res = await testFirebaseConnection(cfg);
+    setIsTesting(false);
+    if (res.success) {
+      setIsConfigured(true);
+      setStatusMessage({ type: 'success', text: res.message });
+    } else {
+      setStatusMessage({ type: 'error', text: res.message });
+    }
+  };
+
+  const handleSave = async () => {
     if (!apiKey.trim() || !projectId.trim()) {
       setStatusMessage({ type: 'error', text: 'Preencha pelo menos a API Key e o Project ID.' });
       return;
@@ -116,15 +160,30 @@ export default function FirebaseConfigModal({
       body: JSON.stringify({ config: newConfig })
     }).catch(err => console.warn('Aviso: servidor offline para salvar config do Firebase:', err));
 
-    const db = initFirebase();
-    if (db) {
-      setIsConfigured(true);
-      setStatusMessage({ type: 'success', text: 'Firebase configurado com sucesso! Conexão em nuvem ativa para todos os dispositivos.' });
-      if (onReloadData) {
-        onReloadData();
-      }
+    initFirebase(true);
+    setIsConfigured(true);
+
+    if (onConfigSaved) {
+      onConfigSaved(newConfig);
+    }
+    if (onReloadData) {
+      onReloadData();
+    }
+
+    setIsTesting(true);
+    setStatusMessage({ type: 'info', text: 'Configuração salva! Testando comunicação com o Cloud Firestore...' });
+    const testRes = await testFirebaseConnection(newConfig);
+    setIsTesting(false);
+    if (testRes.success) {
+      setStatusMessage({ 
+        type: 'success', 
+        text: 'Firebase configurado e conectado com sucesso! Nuvem ativa para todos os celulares e computadores.' 
+      });
     } else {
-      setStatusMessage({ type: 'error', text: 'Falha ao inicializar Firebase. Verifique as credenciais.' });
+      setStatusMessage({ 
+        type: 'warning', 
+        text: 'Configuração salva, mas o Firestore retornou um alerta: ' + testRes.message 
+      });
     }
   };
 
@@ -370,6 +429,29 @@ export default function FirebaseConfigModal({
               </button>
             </div>
           )}
+          {/* Security Rules Helper */}
+          <div className="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200 text-xs text-amber-950 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-amber-700" />
+                Regras do Firestore (Firebase Console):
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyRules}
+                className="text-[11px] font-bold text-amber-800 hover:text-amber-900 bg-white border border-amber-300 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer"
+              >
+                {copiedRules ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                {copiedRules ? 'Copiado!' : 'Copiar Regras'}
+              </button>
+            </div>
+            <pre className="bg-white/80 p-2 rounded border border-amber-200 text-[10px] font-mono overflow-x-auto text-slate-800">
+{firestoreRulesText}
+            </pre>
+            <p className="text-[10px] text-amber-900/80">
+              Cole essas regras na aba <b>Firestore Database &gt; Regras (Rules)</b> no console para permitir que os celulares salvem dados sem restrições.
+            </p>
+          </div>
         </div>
 
         {/* Footer */}
@@ -388,18 +470,28 @@ export default function FirebaseConfigModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={handleTestConnection}
+              disabled={isTesting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg shadow-2xs transition cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-blue-600 ${isTesting ? 'animate-spin' : ''}`} />
+              {isTesting ? 'Testando...' : 'Testar Conexão'}
+            </button>
+            <button
+              type="button"
               onClick={onClose}
-              className="px-4 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg transition cursor-pointer"
+              className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-lg transition cursor-pointer"
             >
               Fechar
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-sm transition cursor-pointer"
+              disabled={isTesting}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-sm transition cursor-pointer disabled:opacity-50"
             >
               <Save className="w-3.5 h-3.5" />
-              Salvar Configuração
+              Salvar e Conectar
             </button>
           </div>
         </div>
