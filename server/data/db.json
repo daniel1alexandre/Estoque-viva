@@ -457,7 +457,7 @@
       "category": "BARRA DE PROTEÍNAS",
       "unit": "UN",
       "minStock": 20,
-      "currentStock": 0
+      "currentStock": 48
     },
     {
       "id": "p-prot-2",
@@ -475,7 +475,7 @@
       "category": "BARRA DE PROTEÍNAS",
       "unit": "UN",
       "minStock": 20,
-      "currentStock": 0
+      "currentStock": 34
     },
     {
       "id": "p-prot-4",
@@ -484,7 +484,7 @@
       "category": "BARRA DE PROTEÍNAS",
       "unit": "SACHÊ",
       "minStock": 20,
-      "currentStock": 0
+      "currentStock": 49
     },
     {
       "id": "p-chip-1",
@@ -1267,7 +1267,7 @@
       "category": "ÁGUA",
       "unit": "GF 500ml",
       "minStock": 48,
-      "currentStock": 0
+      "currentStock": 125
     },
     {
       "id": "p-agu-2",
@@ -1276,7 +1276,7 @@
       "category": "ÁGUA",
       "unit": "GF 500ml",
       "minStock": 36,
-      "currentStock": 0
+      "currentStock": 60
     },
     {
       "id": "p-agu-3",
@@ -1285,7 +1285,7 @@
       "category": "ÁGUA",
       "unit": "CX 1L",
       "minStock": 15,
-      "currentStock": 0
+      "currentStock": 35
     },
     {
       "id": "p-grip-1",
@@ -1351,7 +1351,74 @@
     }
   ],
   "counts": {
-    "loja": {},
+    "loja": {
+      "2026-11-12": {
+        "date": "2026-11-12",
+        "location": "loja",
+        "items": {
+          "p-agu-2": {
+            "productId": "p-agu-2",
+            "currentStock": 60,
+            "entries": 0,
+            "outputCount": 0,
+            "countedStock": null,
+            "difference": 0,
+            "checked": false,
+            "lastModified": "2026-11-12T04:18:42.276Z"
+          },
+          "p-agu-3": {
+            "productId": "p-agu-3",
+            "currentStock": 35,
+            "entries": 0,
+            "outputCount": 0,
+            "countedStock": null,
+            "difference": 0,
+            "checked": false,
+            "lastModified": "2026-11-12T04:18:42.277Z"
+          },
+          "p-agu-1": {
+            "productId": "p-agu-1",
+            "currentStock": 125,
+            "entries": 0,
+            "outputCount": 0,
+            "countedStock": null,
+            "difference": 0,
+            "checked": false,
+            "lastModified": "2026-11-12T04:18:42.277Z"
+          },
+          "p-prot-4": {
+            "productId": "p-prot-4",
+            "currentStock": 49,
+            "entries": 0,
+            "outputCount": 0,
+            "countedStock": null,
+            "difference": 0,
+            "checked": false,
+            "lastModified": "2026-11-12T04:18:42.277Z"
+          },
+          "p-prot-3": {
+            "productId": "p-prot-3",
+            "currentStock": 34,
+            "entries": 0,
+            "outputCount": 0,
+            "countedStock": null,
+            "difference": 0,
+            "checked": false,
+            "lastModified": "2026-11-12T04:18:42.277Z"
+          },
+          "p-prot-1": {
+            "productId": "p-prot-1",
+            "currentStock": 48,
+            "entries": 0,
+            "outputCount": 0,
+            "countedStock": null,
+            "difference": 0,
+            "checked": false,
+            "lastModified": "2026-11-12T04:18:42.277Z"
+          }
+        }
+      }
+    },
     "deposito": {}
   },
   "suppliers": [

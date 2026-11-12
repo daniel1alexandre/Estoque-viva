@@ -30,7 +30,9 @@ import {
   subscribeToRealtimeFirestore,
   resetAllStockAndCountsInFirestore,
   fetchServerFirebaseConfig,
-  checkUrlFirebaseConfig
+  checkUrlFirebaseConfig,
+  syncSessionToFirestore,
+  syncEntireCountsHistoryToFirestore
 } from './services/firebase';
 
 const API_BASE = '/api';
@@ -98,6 +100,7 @@ function hasRealCountData(item) {
   return (item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '') ||
          Number(item.outputCount) > 0 ||
          Number(item.entries) > 0 ||
+         Number(item.currentStock) > 0 ||
          !!item.checked ||
          (typeof item.observation === 'string' && item.observation.trim() !== '');
 }
@@ -122,7 +125,19 @@ function mergeItem(localItem, remoteItem) {
   // If both have data or both are blank, compare timestamp
   const localTime = new Date(localItem.lastModified || 0).getTime();
   const remoteTime = new Date(remoteItem.lastModified || 0).getTime();
-  return remoteTime > localTime ? remoteItem : localItem;
+  const winner = remoteTime >= localTime ? remoteItem : localItem;
+  const loser = winner === remoteItem ? localItem : remoteItem;
+
+  return {
+    ...loser,
+    ...winner,
+    currentStock: (winner.currentStock !== undefined && winner.currentStock !== null && winner.currentStock !== 0)
+      ? winner.currentStock
+      : (loser.currentStock !== undefined && loser.currentStock !== null ? loser.currentStock : winner.currentStock),
+    countedStock: (winner.countedStock !== null && winner.countedStock !== undefined && winner.countedStock !== '')
+      ? winner.countedStock
+      : loser.countedStock
+  };
 }
 
 function mergeSessions(localSession, remoteSession) {
@@ -338,6 +353,10 @@ export default function App() {
             try {
               localStorage.setItem('viva_counts_history', JSON.stringify(merged));
             } catch (e) {}
+            // Dispara sincronização em nuvem caso este dispositivo tenha dados locais que a nuvem ainda não tem
+            if (isFirebaseConfigured()) {
+              syncEntireCountsHistoryToFirestore(merged).catch(() => {});
+            }
             return merged;
           });
 
@@ -664,6 +683,9 @@ export default function App() {
         });
 
         fetch(`${API_BASE}/counts/${selectedDate}?location=${currentLocation}`).catch(() => {});
+        if (isFirebaseConfigured()) {
+          syncSessionToFirestore(currentLocation, selectedDate, newSession);
+        }
       } else {
         // If session exists, but some items have currentStock === 0 and no counts yet, refresh from previous day
         let needsStockRefresh = false;
@@ -693,20 +715,24 @@ export default function App() {
         });
 
         if (needsStockRefresh) {
+          const refreshedSession = {
+            ...currentSess,
+            items: updatedItems
+          };
           setCountsHistory(prev => {
             const next = {
               ...prev,
               [currentLocation]: {
                 ...(prev[currentLocation] || {}),
-                [selectedDate]: {
-                  ...currentSess,
-                  items: updatedItems
-                }
+                [selectedDate]: refreshedSession
               }
             };
             try { localStorage.setItem('viva_counts_history', JSON.stringify(next)); } catch (e) {}
             return next;
           });
+          if (isFirebaseConfigured()) {
+            syncSessionToFirestore(currentLocation, selectedDate, refreshedSession);
+          }
         }
       }
     }
@@ -858,6 +884,11 @@ export default function App() {
       return nextHistory;
     });
 
+    // Sincronização IMEDIATA no Firebase Cloud Firestore para todos os aparelhos conectados verem na hora
+    if (isFirebaseConfigured()) {
+      saveCountItemToFirestore(loc, selectedDate, productId, updatedItem);
+    }
+
     setSaveStatus('saving');
 
     const timerKey = `${loc}_${productId}`;
@@ -970,6 +1001,17 @@ export default function App() {
     });
 
     setSaveStatus('saving');
+
+    // Sincronização IMEDIATA no Firebase
+    if (isFirebaseConfigured()) {
+      saveCountItemToFirestore(loc, selectedDate, productId, {
+        checked: newCheckState,
+        checkedAt: newCheckState ? now : null,
+        countedBy: currentUser ? currentUser.name : undefined,
+        lastModified: now
+      });
+    }
+
     try {
       await fetch(`${API_BASE}/counts/toggle-check`, {
         method: 'POST',
@@ -1052,6 +1094,11 @@ export default function App() {
 
       return nextHistory;
     });
+
+    // Sincronização IMEDIATA no Firebase
+    if (isFirebaseConfigured()) {
+      batchCheckInFirestore(loc, selectedDate, productIds, checkState, currentUser ? currentUser.name : null);
+    }
 
     try {
       await fetch(`${API_BASE}/counts/batch-check`, {

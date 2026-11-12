@@ -351,6 +351,49 @@ export async function batchCheckInFirestore(location, date, productIds, checkSta
   }
 }
 
+// Sync full count session to Firestore
+export async function syncSessionToFirestore(location, date, session) {
+  const db = getDb();
+  if (!db || !session || !session.items) return;
+  try {
+    const docId = `${location}_${date}`;
+    const docRef = doc(db, 'counts', docId);
+    await setDoc(docRef, sanitizeFirestoreData({
+      location,
+      date,
+      items: session.items,
+      updatedAt: new Date().toISOString()
+    }), { merge: true });
+  } catch (err) {
+    console.error(`Erro ao sincronizar sessão ${location}_${date} no Firestore:`, err);
+  }
+}
+
+// Sync entire count history to Firestore (for cross-device bootstrap)
+export async function syncEntireCountsHistoryToFirestore(history) {
+  const db = getDb();
+  if (!db || !history) return;
+  try {
+    for (const [location, sessions] of Object.entries(history)) {
+      if (!sessions || typeof sessions !== 'object') continue;
+      for (const [date, session] of Object.entries(sessions)) {
+        if (session && session.items && Object.keys(session.items).length > 0) {
+          const docId = `${location}_${date}`;
+          const docRef = doc(db, 'counts', docId);
+          await setDoc(docRef, sanitizeFirestoreData({
+            location,
+            date,
+            items: session.items,
+            updatedAt: new Date().toISOString()
+          }), { merge: true });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao sincronizar histórico completo no Firestore:', err);
+  }
+}
+
 // Product CRUD
 export async function saveProductToFirestore(product) {
   const db = getDb();
