@@ -177,6 +177,19 @@ function mergeCountsHistory(localHistory, remoteHistory) {
   return result;
 }
 
+// Obsolete demo users that must be permanently expunged from all devices
+const OBSOLETE_DEMO_USERS = new Set([
+  'usr-1', 'usr-2', 'usr-3', 'usr-4',
+  'carlos eduardo', 'mariana santos', 'lucas oliveira', 'juliana costa'
+]);
+
+function isDemoUser(u) {
+  if (!u) return true;
+  if (u.id && OBSOLETE_DEMO_USERS.has(String(u.id).toLowerCase())) return true;
+  const nameNorm = (u.name || '').trim().toLowerCase();
+  return OBSOLETE_DEMO_USERS.has(nameNorm);
+}
+
 // Intelligent User list merger respecting blacklist of deleted model users
 function mergeUserList(currentLocalUsers, incomingUsers) {
   let deletedUserIds = [];
@@ -186,21 +199,22 @@ function mergeUserList(currentLocalUsers, incomingUsers) {
   const deletedSet = new Set(deletedUserIds);
 
   const map = new Map();
-  (currentLocalUsers || []).forEach(u => {
-    if (u && u.id && !deletedSet.has(u.id)) {
+  (incomingUsers || []).forEach(u => {
+    if (u && u.id && !deletedSet.has(u.id) && !isDemoUser(u)) {
       map.set(u.id, u);
     }
   });
 
-  (incomingUsers || []).forEach(u => {
-    if (u && u.id && !deletedSet.has(u.id)) {
+  (currentLocalUsers || []).forEach(u => {
+    if (u && u.id && !deletedSet.has(u.id) && !isDemoUser(u)) {
       if (!map.has(u.id)) {
         map.set(u.id, u);
       }
     }
   });
 
-  return Array.from(map.values());
+  const list = Array.from(map.values());
+  return list.length > 0 ? list : [{ id: 'usr-altair-junior', name: 'Altair Junior' }];
 }
 
 export default function App() {
@@ -208,11 +222,11 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState([{ id: 'usr-altair-junior', name: 'Altair Junior' }]);
   const [suppliers, setSuppliers] = useState(initialSuppliers);
   // Structure: { loja: { [date]: session }, deposito: { [date]: session } }
   const [countsHistory, setCountsHistory] = useState({ loja: {}, deposito: {} });
-  const [currentUserId, setCurrentUserId] = useState('');
+  const [currentUserId, setCurrentUserId] = useState('usr-altair-junior');
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
   const [loading, setLoading] = useState(true);
 
@@ -339,7 +353,13 @@ export default function App() {
           if (fbData.categories && fbData.categories.length > 0) {
             setCategories(Array.from(new Set(fbData.categories.map(normalizeCategoryName))));
           }
-          setUsers(prev => mergeUserList(prev, fbData.users || []));
+          const cleanUsers = (fbData.users || []).filter(u => !isDemoUser(u));
+          const finalUsers = cleanUsers.length > 0 ? cleanUsers : [{ id: 'usr-altair-junior', name: 'Altair Junior' }];
+          setUsers(finalUsers);
+          try { localStorage.setItem('viva_users', JSON.stringify(finalUsers)); } catch (e) {}
+          if (finalUsers.length > 0) {
+            setCurrentUserId(finalUsers[0].id);
+          }
           if (fbData.suppliers && fbData.suppliers.length > 0) {
             setSuppliers(fbData.suppliers);
             try { localStorage.setItem('viva_suppliers', JSON.stringify(fbData.suppliers)); } catch (e) {}
@@ -478,11 +498,15 @@ export default function App() {
           }
         },
         onUsers: (liveUsers) => {
-          setUsers(prev => {
-            const merged = mergeUserList(prev, liveUsers || []);
-            try { localStorage.setItem('viva_users', JSON.stringify(merged)); } catch (e) {}
-            return merged;
-          });
+          if (Array.isArray(liveUsers) && liveUsers.length > 0) {
+            const clean = liveUsers.filter(u => !isDemoUser(u));
+            const finalUsers = clean.length > 0 ? clean : [{ id: 'usr-altair-junior', name: 'Altair Junior' }];
+            setUsers(finalUsers);
+            try { localStorage.setItem('viva_users', JSON.stringify(finalUsers)); } catch (e) {}
+            if (!finalUsers.some(u => u.id === currentUserId)) {
+              setCurrentUserId(finalUsers[0].id);
+            }
+          }
         },
         onSuppliers: (liveSuppliers) => {
           setSuppliers(liveSuppliers);
@@ -1262,12 +1286,17 @@ export default function App() {
     const tempUser = { id: 'usr-' + Date.now(), name: userData.name };
     let updatedUsers = [];
     setUsers(prev => {
-      const next = [...prev, tempUser];
+      const next = [...prev.filter(u => !isDemoUser(u)), tempUser];
       updatedUsers = next;
       try { localStorage.setItem('viva_users', JSON.stringify(next)); } catch (e) {}
       return next;
     });
     setCurrentUserId(tempUser.id);
+
+    // Sincronização IMEDIATA no Firebase Firestore
+    if (isFirebaseConfigured()) {
+      saveUserToFirestore(tempUser);
+    }
 
     try {
       const res = await fetch(`${API_BASE}/users`, {
@@ -1294,14 +1323,11 @@ export default function App() {
         body: JSON.stringify({ users: updatedUsers })
       }).catch(() => {});
 
-      if (isFirebaseConfigured()) {
+      if (isFirebaseConfigured() && savedUser.id !== tempUser.id) {
         saveUserToFirestore(savedUser);
       }
     } catch (err) {
-      console.error('Erro ao adicionar usuário no servidor:', err);
-      if (isFirebaseConfigured()) {
-        saveUserToFirestore(tempUser);
-      }
+      console.warn('Servidor offline ao adicionar usuário, mantido no Firebase:', err);
     }
   };
 
@@ -1318,13 +1344,18 @@ export default function App() {
     let remainingUsers = [];
     setUsers(prev => {
       const remaining = prev.filter(u => u.id !== userId);
-      remainingUsers = remaining;
-      try { localStorage.setItem('viva_users', JSON.stringify(remaining)); } catch (e) {}
-      if (currentUserId === userId && remaining.length > 0) {
-        setCurrentUserId(remaining[0].id);
+      remainingUsers = remaining.length > 0 ? remaining : [{ id: 'usr-altair-junior', name: 'Altair Junior' }];
+      try { localStorage.setItem('viva_users', JSON.stringify(remainingUsers)); } catch (e) {}
+      if (currentUserId === userId && remainingUsers.length > 0) {
+        setCurrentUserId(remainingUsers[0].id);
       }
-      return remaining;
+      return remainingUsers;
     });
+
+    // Exclusão IMEDIATA no Firebase Firestore
+    if (isFirebaseConfigured()) {
+      deleteUserFromFirestore(userId);
+    }
 
     try {
       await fetch(`${API_BASE}/users/${userId}`, { 
@@ -1337,11 +1368,7 @@ export default function App() {
         body: JSON.stringify({ users: remainingUsers })
       }).catch(() => {});
     } catch (err) {
-      console.error('Erro ao excluir usuário no backend:', err);
-    }
-
-    if (isFirebaseConfigured()) {
-      deleteUserFromFirestore(userId);
+      console.warn('Servidor offline ao excluir usuário, excluído no Firebase:', err);
     }
   };
 

@@ -1334,20 +1334,8 @@
   ],
   "users": [
     {
-      "id": "usr-1",
-      "name": "Carlos Eduardo"
-    },
-    {
-      "id": "usr-2",
-      "name": "Mariana Santos"
-    },
-    {
-      "id": "usr-3",
-      "name": "Lucas Oliveira"
-    },
-    {
-      "id": "usr-4",
-      "name": "Juliana Costa"
+      "id": "usr-altair-junior",
+      "name": "Altair Junior"
     }
   ],
   "counts": {
