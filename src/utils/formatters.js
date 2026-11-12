@@ -82,9 +82,49 @@ export function normalizeCategoryName(cat) {
   if (!cat || typeof cat !== 'string') return '';
   const trimmed = cat.trim();
   const unaccented = trimmed.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-  if (unaccented === 'BARRA DE PROTEINA' || unaccented === 'BARRA DE PROTEINAS' || unaccented === 'BARRAS DE PROTEINAS' || unaccented === 'BARRA DE PROTEÍNAS' || unaccented === 'BARRA DE PROTÉINAS') {
+  
+  if (
+    unaccented === 'BARRA DE PROTEINA' || 
+    unaccented === 'BARRA DE PROTEINAS' || 
+    unaccented === 'BARRAS DE PROTEINAS' || 
+    unaccented === 'BARRAS DE PROTEINA'
+  ) {
     return 'BARRA DE PROTEÍNAS';
   }
+  if (unaccented === 'AGUA') return 'ÁGUA';
+  if (unaccented === 'ENERGETICO' || unaccented === 'ENERGETICOS') return 'ENERGÉTICOS';
+  if (unaccented === 'ISOTONICO' || unaccented === 'ISOTONICOS') return 'ISOTONICOS';
+  if (unaccented === 'CHA') return 'CHA';
+
   return trimmed;
+}
+
+// Robust matcher that ALWAYS returns an exact string present in catList if there is a match
+export function matchCategoryInList(cat, catList) {
+  if (!cat) return (catList && catList[0]) || '';
+  if (!catList || !Array.isArray(catList) || catList.length === 0) return cat;
+
+  // 1. Direct exact match
+  if (catList.includes(cat)) return cat;
+
+  // 2. Direct case-insensitive match
+  const lower = cat.toLowerCase();
+  const foundCase = catList.find(c => (c || '').toLowerCase() === lower);
+  if (foundCase) return foundCase;
+
+  // 3. Normalized canonical match
+  const norm = normalizeCategoryName(cat).toUpperCase();
+  const foundNorm = catList.find(c => normalizeCategoryName(c).toUpperCase() === norm);
+  if (foundNorm) return foundNorm;
+
+  // 4. Unaccented match
+  const unaccent = cat.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase();
+  const foundUnaccent = catList.find(c => 
+    (c || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase() === unaccent
+  );
+  if (foundUnaccent) return foundUnaccent;
+
+  // Fallback: return the normalized category string
+  return normalizeCategoryName(cat);
 }
 

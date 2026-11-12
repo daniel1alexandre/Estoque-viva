@@ -157,6 +157,16 @@ let db = loadDatabase();
 
 // ---------------- ROUTES ----------------
 
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC9IVTbGmIkQsPIBv2p61sw6Q2JzrFQR7I",
+  authDomain: "estoque-viva.firebaseapp.com",
+  projectId: "estoque-viva",
+  storageBucket: "estoque-viva.firebasestorage.app",
+  messagingSenderId: "716156470521",
+  appId: "1:716156470521:web:e2e738defc4b47d2abce28",
+  measurementId: "G-SH3PDHZF4Q"
+};
+
 // Firebase configuration auto-sync across devices
 app.get('/api/firebase-config', (req, res) => {
   if (db.firebaseConfig && db.firebaseConfig.apiKey && db.firebaseConfig.projectId) {
@@ -170,11 +180,12 @@ app.get('/api/firebase-config', (req, res) => {
       projectId: process.env.VITE_FIREBASE_PROJECT_ID,
       storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
       messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-      appId: process.env.VITE_FIREBASE_APP_ID || ''
+      appId: process.env.VITE_FIREBASE_APP_ID || '',
+      measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || ''
     };
     return res.json({ configured: true, config: envConfig });
   }
-  res.json({ configured: false, config: null });
+  return res.json({ configured: true, config: DEFAULT_FIREBASE_CONFIG });
 });
 
 app.post('/api/firebase-config', (req, res) => {

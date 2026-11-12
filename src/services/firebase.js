@@ -14,6 +14,17 @@ import {
 
 const STORAGE_KEY = 'viva_firebase_config';
 
+// Embedded default Firebase configuration - connects all devices out-of-the-box
+export const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC9IVTbGmIkQsPIBv2p61sw6Q2JzrFQR7I",
+  authDomain: "estoque-viva.firebaseapp.com",
+  projectId: "estoque-viva",
+  storageBucket: "estoque-viva.firebasestorage.app",
+  messagingSenderId: "716156470521",
+  appId: "1:716156470521:web:e2e738defc4b47d2abce28",
+  measurementId: "G-SH3PDHZF4Q"
+};
+
 // Check for ?fb_cfg= in URL on startup for zero-friction mobile/multi-device connection
 export function checkUrlFirebaseConfig() {
   if (typeof window === 'undefined') return null;
@@ -74,14 +85,20 @@ export function getFirebaseConfig() {
   }
 
   // 3. Fallback to Vite environment variables
-  return {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-    appId: import.meta.env.VITE_FIREBASE_APP_ID || ''
-  };
+  if (import.meta.env.VITE_FIREBASE_API_KEY && import.meta.env.VITE_FIREBASE_PROJECT_ID) {
+    return {
+      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+      appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+      measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ''
+    };
+  }
+
+  // 4. Default embedded configuration - connects every device out of the box
+  return DEFAULT_FIREBASE_CONFIG;
 }
 
 export function saveFirebaseConfig(config) {
@@ -255,6 +272,25 @@ export async function loadDataFromFirestore() {
   }
 }
 
+// Helper to strip undefined values so Firestore never throws unsupported field value errors
+function sanitizeFirestoreData(obj) {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeFirestoreData(item)).filter(item => item !== undefined);
+  }
+  const cleaned = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) {
+      cleaned[key] = null;
+    } else if (value && typeof value === 'object' && !(value instanceof Date)) {
+      cleaned[key] = sanitizeFirestoreData(value);
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
 // Save single count item to Firestore (Atomic nested merge)
 export async function saveCountItemToFirestore(location, date, productId, itemData) {
   const db = getDb();
@@ -271,14 +307,14 @@ export async function saveCountItemToFirestore(location, date, productId, itemDa
       lastModified: itemData.lastModified || now
     };
 
-    await setDoc(docRef, {
+    await setDoc(docRef, sanitizeFirestoreData({
       location,
       date,
       items: {
         [productId]: itemToSave
       },
       updatedAt: now
-    }, { merge: true });
+    }), { merge: true });
   } catch (err) {
     console.error(`Erro ao salvar item ${productId} no Firestore:`, err);
   }
@@ -299,39 +335,20 @@ export async function batchCheckInFirestore(location, date, productIds, checkSta
       itemsPatch[id] = {
         checked: checkState,
         checkedAt: checkState ? now : null,
-        countedBy: countedBy || undefined,
+        countedBy: countedBy || null,
         lastModified: now
       };
     });
 
-    await setDoc(docRef, {
+    await setDoc(docRef, sanitizeFirestoreData({
       location,
       date,
       items: itemsPatch,
       updatedAt: now
-    }, { merge: true });
+    }), { merge: true });
   } catch (err) {
     console.error('Erro ao realizar batch check no Firestore:', err);
   }
-}
-
-// Helper to strip undefined values so Firestore never throws unsupported field value errors
-function sanitizeFirestoreData(obj) {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) {
-    return obj.map(item => sanitizeFirestoreData(item)).filter(item => item !== undefined);
-  }
-  const cleaned = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (value === undefined) {
-      cleaned[key] = null;
-    } else if (value && typeof value === 'object' && !(value instanceof Date)) {
-      cleaned[key] = sanitizeFirestoreData(value);
-    } else {
-      cleaned[key] = value;
-    }
-  }
-  return cleaned;
 }
 
 // Product CRUD

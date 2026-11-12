@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X, Plus, Edit2, Trash2, Package, Layers, Check, Search, RotateCcw } from 'lucide-react';
-import { normalizeCategoryName } from '../utils/formatters';
+import { normalizeCategoryName, matchCategoryInList } from '../utils/formatters';
 
 export default function ProductManagementModal({
   isOpen,
@@ -54,11 +54,7 @@ export default function ProductManagementModal({
     setIsCreatingNew(false);
     setEditingProductId(prod.id);
     setEditName(prod.name);
-    const normCat = normalizeCategoryName(prod.category);
-    const matchedCat = categories.find(c => 
-      normalizeCategoryName(c).toUpperCase() === normCat.toUpperCase()
-    );
-    setEditCategory(matchedCat || normCat);
+    setEditCategory(matchCategoryInList(prod.category, categories));
     setEditUnit(prod.unit || 'UN');
     setEditMinStock(String(prod.minStock || 0));
     setEditStock(String(prod.currentStock || 0));
@@ -73,7 +69,7 @@ export default function ProductManagementModal({
     onSaveProduct({
       id: prodId,
       name: editName.trim(),
-      category: editCategory,
+      category: matchCategoryInList(editCategory, categories),
       unit: editUnit.trim() || 'UN',
       minStock: Number(editMinStock) || 0,
       currentStock: Number(editStock) || 0,
@@ -107,7 +103,7 @@ export default function ProductManagementModal({
       id: generatedId,
       code: generatedCode,
       name: newName.trim(),
-      category: newCategory,
+      category: matchCategoryInList(newCategory, categories),
       unit: newUnit.trim() || 'UN',
       minStock: Number(newMinStock) || 0,
       currentStock: Number(newCurrentStock) || 0,
@@ -420,7 +416,7 @@ export default function ProductManagementModal({
                             {categories.map(c => (
                               <option key={c} value={c}>{c}</option>
                             ))}
-                            {editCategory && !categories.some(c => normalizeCategoryName(c).toUpperCase() === normalizeCategoryName(editCategory).toUpperCase()) && (
+                            {editCategory && !categories.includes(editCategory) && (
                               <option value={editCategory}>{editCategory}</option>
                             )}
                           </select>
@@ -493,7 +489,7 @@ export default function ProductManagementModal({
                       <td className="py-2.5 px-3 font-semibold text-slate-900">{p.name}</td>
                       <td className="py-2.5 px-3">
                         <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-medium">
-                          {p.category}
+                          {matchCategoryInList(p.category, categories)}
                         </span>
                       </td>
                       <td className="py-2.5 px-3">
