@@ -84,7 +84,7 @@ export default function GeneralStockView({
       const estoqueLoja = getStockForProduct('loja', product.id, product.currentStock || 0);
 
       // 2. Depósito Stock Calculation
-      const estoqueDeposito = getStockForProduct('deposito', product.id, product.currentStock || 0);
+      const estoqueDeposito = getStockForProduct('deposito', product.id, product.depositoStock ?? 0);
 
       // 3. Estoque Geral (Loja + Depósito)
       const estoqueGeral = estoqueLoja + estoqueDeposito;

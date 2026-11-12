@@ -51,21 +51,30 @@ export default function DailyCountView({
 
   const handleStartStockAdjustment = (prodId, currentVal) => {
     setEditingStockProdId(prodId);
-    setAdjustedStockValue(String(currentVal));
+    setAdjustedStockValue(String(currentVal ?? 0));
   };
 
-  const handleSaveStockAdjustment = (prodId, isDep = false, currentEntries = 0) => {
+  const handleSaveStockAdjustment = (prodId, isDep = false) => {
     const num = Number(adjustedStockValue);
     if (!isNaN(num) && num >= 0) {
-      const newStock = isDep ? Math.max(0, num - currentEntries) : num;
-      onUpdateItem(prodId, { currentStock: newStock });
+      // 1. Atualiza imediatamente o item da contagem nesta data como estoque manual protegido
+      onUpdateItem(prodId, { currentStock: num, isManualStock: true });
+
+      // 2. Atualiza o cadastro base do produto separadamente para Loja ou Depósito
       if (onSaveProduct) {
         const prod = products.find(p => p.id === prodId);
         if (prod) {
-          onSaveProduct({
-            ...prod,
-            currentStock: newStock
-          });
+          if (isDep) {
+            onSaveProduct({
+              ...prod,
+              depositoStock: num
+            });
+          } else {
+            onSaveProduct({
+              ...prod,
+              currentStock: num
+            });
+          }
         }
       }
     }
@@ -460,10 +469,10 @@ export default function DailyCountView({
           <table className="w-full text-left text-sm border-collapse min-w-[950px]">
             <thead>
               {isDeposito ? (
-                /* DEPÓSITO TABLE HEADER: Produto, Estoque, Entradas e Observações */
+                /* DEPÓSITO TABLE HEADER: Produto, Estoque Depósito, Entradas e Observações */
                 <tr className="bg-slate-50/90 text-slate-700 font-semibold text-xs border-b border-slate-200">
                   <th className="py-3 px-3 min-w-[280px]">Item / Produto</th>
-                  <th className="py-3 px-2 text-center w-36">Estoque</th>
+                  <th className="py-3 px-2 text-center w-36">Estoque Depósito</th>
                   <th className="py-3 px-2 text-center w-36 bg-emerald-50/50 text-emerald-950 border-x border-emerald-100">Entradas (+)</th>
                   <th className="py-3 px-3 min-w-[260px]">Observações</th>
                 </tr>
@@ -495,9 +504,13 @@ export default function DailyCountView({
                 </tr>
               ) : (
                 filteredProducts.map((product) => {
+                  const fallbackStock = isDeposito
+                    ? (product.depositoStock ?? product.currentStock ?? 0)
+                    : (product.currentStock ?? 0);
+
                   const item = items[product.id] || {
                     productId: product.id,
-                    currentStock: product.currentStock,
+                    currentStock: fallbackStock,
                     entries: 0,
                     outputCount: null,
                     countedStock: null,
@@ -507,7 +520,7 @@ export default function DailyCountView({
                     observation: ''
                   };
 
-                  const currentStock = Number(item.currentStock ?? product.currentStock) || 0;
+                  const currentStock = Number(item.currentStock ?? fallbackStock) || 0;
                   const entries = Number(item.entries) || 0;
                   const tardeCount = Number(item.outputCount) || 0;
                   const hasCount = item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '';
@@ -611,7 +624,7 @@ export default function DailyCountView({
                         )}
                       </td>
 
-                      {/* 3. Estoque / Estoque Inicial com ícone de editar */}
+                      {/* 3. Estoque / Estoque Inicial com botão de alterar sempre acessível */}
                       <td className="py-2.5 px-2 text-center font-semibold text-slate-800">
                         {editingStockProdId === product.id ? (
                           <div className="flex items-center justify-center gap-1">
@@ -621,56 +634,39 @@ export default function DailyCountView({
                               value={adjustedStockValue}
                               onChange={(e) => setAdjustedStockValue(e.target.value)}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSaveStockAdjustment(product.id, isDeposito, entries);
+                                if (e.key === 'Enter') handleSaveStockAdjustment(product.id, isDeposito);
                                 if (e.key === 'Escape') setEditingStockProdId(null);
                               }}
                               autoFocus
-                              className="w-16 text-center font-bold text-blue-700 bg-white border border-blue-400 rounded px-1 py-0.5 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                              className="w-20 text-center font-bold text-blue-700 bg-white border border-blue-400 rounded px-1.5 py-1 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm"
                             />
                             <button
                               type="button"
-                              onClick={() => handleSaveStockAdjustment(product.id, isDeposito, entries)}
-                              className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
-                              title="Salvar ajuste"
+                              onClick={() => handleSaveStockAdjustment(product.id, isDeposito)}
+                              className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer shadow-xs transition"
+                              title="Salvar valor de estoque"
                             >
-                              <Check className="w-3 h-3" />
+                              <Check className="w-3.5 h-3.5" />
                             </button>
                             <button
                               type="button"
                               onClick={() => setEditingStockProdId(null)}
-                              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded cursor-pointer transition"
                               title="Cancelar"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-center gap-1 group">
-                            {isDeposito ? (
-                              /* No depósito, o estoque exibido é a soma (Estoque Base + Entradas) */
-                              <div className="flex items-center gap-1">
-                                <span className="font-bold text-slate-900 text-sm">
-                                  {currentStock + entries}
-                                </span>
-                                {entries > 0 && (
-                                  <span 
-                                    className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-1 rounded shadow-2xs" 
-                                    title={`Estoque base: ${currentStock} + Entrada de hoje: ${entries}`}
-                                  >
-                                    +{entries}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="font-bold text-slate-800">{currentStock}</span>
-                            )}
+                          <div className="flex items-center justify-center">
                             <button
                               type="button"
-                              onClick={() => handleStartStockAdjustment(product.id, isDeposito ? (currentStock + entries) : currentStock)}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer"
-                              title={isDeposito ? "Ajustar valor do estoque" : "Ajustar estoque inicial"}
+                              onClick={() => handleStartStockAdjustment(product.id, currentStock)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-800 hover:text-blue-700 border border-slate-200 hover:border-blue-300 transition cursor-pointer group shadow-2xs"
+                              title={isDeposito ? "Clique para alterar o valor do estoque no depósito" : "Clique para alterar o estoque inicial na loja"}
                             >
-                              <Edit2 className="w-3 h-3" />
+                              <span className="font-bold text-sm text-slate-900">{currentStock}</span>
+                              <Edit2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition" />
                             </button>
                           </div>
                         )}

@@ -26,7 +26,8 @@ export default function ProductManagementModal({
   const [newCategory, setNewCategory] = useState(categories[0] || '');
   const [newUnit, setNewUnit] = useState('UN');
   const [newMinStock, setNewMinStock] = useState('10');
-  const [newCurrentStock, setNewCurrentStock] = useState('50');
+  const [newCurrentStock, setNewCurrentStock] = useState('0');
+  const [newDepositoStock, setNewDepositoStock] = useState('0');
   const [newSupplierId, setNewSupplierId] = useState('');
 
   // Inline edit row form fields
@@ -35,6 +36,7 @@ export default function ProductManagementModal({
   const [editUnit, setEditUnit] = useState('UN');
   const [editMinStock, setEditMinStock] = useState('10');
   const [editStock, setEditStock] = useState('0');
+  const [editDepositoStock, setEditDepositoStock] = useState('0');
   const [editSupplierId, setEditSupplierId] = useState('');
 
   if (!isOpen) return null;
@@ -58,6 +60,7 @@ export default function ProductManagementModal({
     setEditUnit(prod.unit || 'UN');
     setEditMinStock(String(prod.minStock || 0));
     setEditStock(String(prod.currentStock || 0));
+    setEditDepositoStock(String(prod.depositoStock || 0));
     setEditSupplierId(prod.supplierId || '');
   };
 
@@ -73,6 +76,7 @@ export default function ProductManagementModal({
       unit: editUnit.trim() || 'UN',
       minStock: Number(editMinStock) || 0,
       currentStock: Number(editStock) || 0,
+      depositoStock: Number(editDepositoStock) || 0,
       supplierId: editSupplierId || null,
       supplierName: matchedSup ? matchedSup.name : null
     });
@@ -87,7 +91,8 @@ export default function ProductManagementModal({
     setNewCategory(categories[0] || '');
     setNewUnit('UN');
     setNewMinStock('10');
-    setNewCurrentStock('50');
+    setNewCurrentStock('0');
+    setNewDepositoStock('0');
     setNewSupplierId('');
   };
 
@@ -107,6 +112,7 @@ export default function ProductManagementModal({
       unit: newUnit.trim() || 'UN',
       minStock: Number(newMinStock) || 0,
       currentStock: Number(newCurrentStock) || 0,
+      depositoStock: Number(newDepositoStock) || 0,
       supplierId: newSupplierId || null,
       supplierName: matchedSup ? matchedSup.name : null
     });
@@ -341,6 +347,28 @@ export default function ProductManagementModal({
                 </div>
 
                 <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Estoque Loja</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newCurrentStock}
+                    onChange={(e) => setNewCurrentStock(e.target.value)}
+                    className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-amber-800 mb-1">Estoque Depósito</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newDepositoStock}
+                    onChange={(e) => setNewDepositoStock(e.target.value)}
+                    className="w-full text-xs border border-amber-300 rounded-lg p-2 focus:ring-2 focus:ring-amber-500 bg-white"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Estoque Mínimo</label>
                   <input
                     type="number"
@@ -378,7 +406,8 @@ export default function ProductManagementModal({
                   <th className="py-2.5 px-3">Nome do Produto</th>
                   <th className="py-2.5 px-3">Categoria</th>
                   <th className="py-2.5 px-3">Fornecedor</th>
-                  <th className="py-2.5 px-3 text-center">Estoque Atual</th>
+                  <th className="py-2.5 px-3 text-center">Estoque Loja</th>
+                  <th className="py-2.5 px-3 text-center text-amber-900 bg-amber-50/50">Estoque Depósito</th>
                   <th className="py-2.5 px-3 text-center">Estoque Mínimo</th>
                   <th className="py-2.5 px-3 text-right">Ações</th>
                 </tr>
@@ -436,14 +465,27 @@ export default function ProductManagementModal({
                           </select>
                         </td>
 
-                        {/* Estoque Atual input */}
+                        {/* Estoque Loja input */}
                         <td className="py-2 px-3 text-center">
                           <input
                             type="number"
                             min="0"
                             value={editStock}
                             onChange={(e) => setEditStock(e.target.value)}
-                            className="w-20 mx-auto text-center text-xs border border-blue-400 rounded-md px-2 py-1.5 bg-white font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            title="Estoque Loja"
+                            className="w-16 mx-auto text-center text-xs border border-blue-400 rounded-md px-2 py-1.5 bg-white font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+
+                        {/* Estoque Depósito input */}
+                        <td className="py-2 px-3 text-center bg-amber-50/40">
+                          <input
+                            type="number"
+                            min="0"
+                            value={editDepositoStock}
+                            onChange={(e) => setEditDepositoStock(e.target.value)}
+                            title="Estoque Depósito"
+                            className="w-16 mx-auto text-center text-xs border border-amber-400 rounded-md px-2 py-1.5 bg-white font-bold text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
                           />
                         </td>
 
@@ -501,7 +543,8 @@ export default function ProductManagementModal({
                           <span className="text-[11px] text-slate-400 italic">Não vinculado</span>
                         )}
                       </td>
-                      <td className="py-2.5 px-3 text-center font-bold text-slate-800">{p.currentStock}</td>
+                      <td className="py-2.5 px-3 text-center font-bold text-slate-800">{p.currentStock || 0}</td>
+                      <td className="py-2.5 px-3 text-center font-bold text-amber-900 bg-amber-50/40">{p.depositoStock || 0}</td>
                       <td className="py-2.5 px-3 text-center text-slate-500 font-medium">{p.minStock || 0}</td>
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">

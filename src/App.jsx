@@ -660,16 +660,19 @@ export default function App() {
       const locCounts = countsHistory[currentLocation] || {};
       const currentSess = locCounts[selectedDate];
       const defaultUser = users.find(u => u.id === currentUserId) || users[0];
-      const mult = currentLocation === 'deposito' ? 2.5 : 1;
 
       if (!currentSess) {
         const newItems = {};
         products.forEach(p => {
+          const fallback = currentLocation === 'deposito'
+            ? (p.depositoStock ?? p.currentStock ?? 0)
+            : (p.currentStock ?? 0);
+
           const initialStock = getPrevCountedStock(
             currentLocation,
             selectedDate,
             p.id,
-            Math.round((p.currentStock || 0) * mult)
+            fallback
           );
 
           newItems[p.id] = {
@@ -711,30 +714,31 @@ export default function App() {
           syncSessionToFirestore(currentLocation, selectedDate, newSession);
         }
       } else {
-        // If session exists, but some items have currentStock === 0 and no counts yet, refresh from previous day
+        // If session exists, only add missing products without interfering with existing items
         let needsStockRefresh = false;
         const updatedItems = { ...currentSess.items };
 
         products.forEach(p => {
           const it = updatedItems[p.id];
-          const prevStock = getPrevCountedStock(currentLocation, selectedDate, p.id, null);
-          if (prevStock !== null && prevStock > 0) {
-            if (!it || (!hasRealCountData(it) && (!it.currentStock || Number(it.currentStock) === 0))) {
-              updatedItems[p.id] = {
-                ...(it || {}),
-                productId: p.id,
-                currentStock: prevStock,
-                entries: it ? it.entries : 0,
-                outputCount: it ? it.outputCount : 0,
-                countedStock: it ? it.countedStock : null,
-                difference: it ? it.difference : 0,
-                checked: it ? it.checked : false,
-                countedBy: it?.countedBy || defaultUser?.name || 'Conferente',
-                observation: it?.observation || '',
-                lastModified: new Date().toISOString()
-              };
-              needsStockRefresh = true;
-            }
+          if (!it) {
+            const fallback = currentLocation === 'deposito' 
+              ? (p.depositoStock ?? p.currentStock ?? 0)
+              : (p.currentStock ?? 0);
+            const prevStock = getPrevCountedStock(currentLocation, selectedDate, p.id, fallback);
+            updatedItems[p.id] = {
+              productId: p.id,
+              currentStock: prevStock,
+              entries: 0,
+              outputCount: 0,
+              countedStock: null,
+              difference: 0,
+              checked: false,
+              checkedAt: null,
+              countedBy: defaultUser ? defaultUser.name : 'Conferente',
+              observation: '',
+              lastModified: new Date().toISOString()
+            };
+            needsStockRefresh = true;
           }
         });
 
@@ -880,18 +884,21 @@ export default function App() {
           const nextSess = updatedLoc[nextDate];
           if (nextSess && nextSess.items && nextSess.items[productId]) {
             const nextIt = { ...nextSess.items[productId] };
-            nextIt.currentStock = finalStockToPropagate;
-            const nextGeral = nextIt.currentStock + (Number(nextIt.entries) || 0) - (Number(nextIt.outputCount) || 0);
-            if (nextIt.countedStock !== null && nextIt.countedStock !== undefined && nextIt.countedStock !== '') {
-              nextIt.difference = Number(nextIt.countedStock) - nextGeral;
-            }
-            updatedLoc[nextDate] = {
-              ...nextSess,
-              items: {
-                ...nextSess.items,
-                [productId]: nextIt
+            // NUNCA sobrescreve se o usuário alterou manualmente o estoque ou se já existem contagens registradas
+            if (!nextIt.isManualStock && (!nextIt.currentStock || Number(nextIt.currentStock) === 0) && !hasRealCountData(nextIt)) {
+              nextIt.currentStock = finalStockToPropagate;
+              const nextGeral = nextIt.currentStock + (Number(nextIt.entries) || 0) - (Number(nextIt.outputCount) || 0);
+              if (nextIt.countedStock !== null && nextIt.countedStock !== undefined && nextIt.countedStock !== '') {
+                nextIt.difference = Number(nextIt.countedStock) - nextGeral;
               }
-            };
+              updatedLoc[nextDate] = {
+                ...nextSess,
+                items: {
+                  ...nextSess.items,
+                  [productId]: nextIt
+                }
+              };
+            }
           }
         }
       }
