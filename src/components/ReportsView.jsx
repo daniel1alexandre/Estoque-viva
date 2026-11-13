@@ -213,7 +213,7 @@ export default function ReportsView({
 
       // Depósito details
       const depItem = depositoSession[product.id];
-      const depInitial = Number(depItem?.currentStock ?? product.currentStock) || 0;
+      const depInitial = Number(depItem?.currentStock ?? product.depositoStock ?? 0) || 0;
       const depEntries = Number(depItem?.entries) || 0;
       const estoqueDeposito = depInitial + depEntries;
       const depObs = depItem?.observation || '';

@@ -47,10 +47,10 @@ export default function OrdersView({
     return products.map(product => {
       // 1. Depósito stock: base stock + entries
       const depItem = depositoSession[product.id];
-      let stock = product.currentStock || 0;
+      let stock = product.depositoStock ?? 0;
       let entries = 0;
       if (depItem) {
-        stock = Number(depItem.currentStock ?? product.currentStock) || 0;
+        stock = Number(depItem.currentStock ?? product.depositoStock ?? 0) || 0;
         entries = Number(depItem.entries) || 0;
       }
       const totalDepositoStock = stock + entries;
@@ -65,8 +65,12 @@ export default function OrdersView({
         } else {
           const cur = Number(lojaItem.currentStock ?? product.currentStock) || 0;
           const ent = Number(lojaItem.entries) || 0;
-          const diff = Math.abs(Number(lojaItem.difference) || 0);
-          lojaStock = Math.max(0, cur + ent - diff);
+          const hasTarde = lojaItem.outputCount !== null && lojaItem.outputCount !== undefined && lojaItem.outputCount !== '';
+          if (hasTarde) {
+            lojaStock = Number(lojaItem.outputCount);
+          } else {
+            lojaStock = cur + ent;
+          }
         }
       }
 

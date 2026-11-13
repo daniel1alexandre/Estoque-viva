@@ -44,35 +44,14 @@ export default function GeneralStockView({
           if (hasCount) return Number(itemOnDate.countedStock);
           const cur = Number(itemOnDate.currentStock ?? fallbackStock) || 0;
           const ent = Number(itemOnDate.entries) || 0;
-          const diff = Math.abs(Number(itemOnDate.difference) || 0);
-          if (cur > 0 || ent > 0) return Math.max(0, cur + ent - diff);
+          const hasTarde = itemOnDate.outputCount !== null && itemOnDate.outputCount !== undefined && itemOnDate.outputCount !== '';
+          if (hasTarde) return Number(itemOnDate.outputCount);
+          return cur + ent;
         } else {
+          // Depósito: Estoque do Depósito + Entradas (+)
           const baseDep = Number(itemOnDate.currentStock ?? fallbackStock) || 0;
           const entriesDep = Number(itemOnDate.entries) || 0;
-          if (baseDep > 0 || entriesDep > 0) return baseDep + entriesDep;
-        }
-      }
-
-      // 2. If no count on selectedDate, search prior dates (closest first)
-      const priorDates = Object.keys(locCounts)
-        .filter(d => d < selectedDate)
-        .sort((a, b) => b.localeCompare(a));
-
-      for (const d of priorDates) {
-        const priorItem = locCounts[d]?.items?.[prodId];
-        if (priorItem) {
-          if (loc === 'loja') {
-            if (priorItem.countedStock !== null && priorItem.countedStock !== undefined && priorItem.countedStock !== '') {
-              return Number(priorItem.countedStock);
-            }
-            const cur = Number(priorItem.currentStock) || 0;
-            const ent = Number(priorItem.entries) || 0;
-            if (cur > 0 || ent > 0) return cur + ent;
-          } else {
-            const base = Number(priorItem.currentStock) || 0;
-            const ent = Number(priorItem.entries) || 0;
-            if (base > 0 || ent > 0) return base + ent;
-          }
+          return baseDep + entriesDep;
         }
       }
 

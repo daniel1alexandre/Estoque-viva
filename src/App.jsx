@@ -105,40 +105,21 @@ function hasRealCountData(item) {
          (typeof item.observation === 'string' && item.observation.trim() !== '');
 }
 
-// Timestamp-based intelligent merge with protective rules so blank/default items never overwrite real counts
+// Timestamp-based synchronization so values typed on any device are always visible to everyone
 function mergeItem(localItem, remoteItem) {
   if (!localItem) return remoteItem;
   if (!remoteItem) return localItem;
 
-  const localHas = hasRealCountData(localItem);
-  const remoteHas = hasRealCountData(remoteItem);
-
-  // If local has real user inputs and remote is blank/default, local ALWAYS wins!
-  if (localHas && !remoteHas) {
-    return localItem;
-  }
-  // If remote has real user inputs and local is blank/default, remote wins!
-  if (!localHas && remoteHas) {
-    return remoteItem;
-  }
-
-  // If both have data or both are placeholders: compare timestamp
   const localTime = localItem.lastModified ? new Date(localItem.lastModified).getTime() : 0;
   const remoteTime = remoteItem.lastModified ? new Date(remoteItem.lastModified).getTime() : 0;
-  const winner = remoteTime >= localTime ? remoteItem : localItem;
-  const loser = winner === remoteItem ? localItem : remoteItem;
 
-  return {
-    ...loser,
-    ...winner,
-    currentStock: (winner.currentStock !== undefined && winner.currentStock !== null)
-      ? winner.currentStock
-      : (loser.currentStock !== undefined && loser.currentStock !== null ? loser.currentStock : 0),
-    isManualStock: winner.isManualStock ?? loser.isManualStock ?? false,
-    countedStock: (winner.countedStock !== null && winner.countedStock !== undefined && winner.countedStock !== '')
-      ? winner.countedStock
-      : (loser.countedStock !== null && loser.countedStock !== undefined && loser.countedStock !== '' ? loser.countedStock : null)
-  };
+  // Se o item remoto do Firebase tem carimbo real e o local é apenas um placeholder de renderização inicial:
+  if (remoteTime > 0 && localTime === 0) return remoteItem;
+  // Se o item local tem carimbo real e o remoto é placeholder:
+  if (localTime > 0 && remoteTime === 0) return localItem;
+
+  // Se ambos têm carimbo real ou ambos são placeholders: o mais recente vence (nuvem desempata a favor da sincronização)
+  return remoteTime >= localTime ? remoteItem : localItem;
 }
 
 function mergeSessions(localSession, remoteSession) {
@@ -773,11 +754,15 @@ export default function App() {
     const loc = currentLocation;
     const currentUser = users.find(u => u.id === currentUserId) || users[0];
     const prevSession = (countsHistory[loc] && countsHistory[loc][selectedDate]) || { date: selectedDate, items: {} };
+    const targetProduct = products.find(p => p.id === productId);
+    const defaultStock = loc === 'deposito' 
+      ? (targetProduct?.depositoStock ?? targetProduct?.currentStock ?? 0)
+      : (targetProduct?.currentStock ?? 0);
     const prevItem = prevSession.items[productId] || {
       productId,
-      currentStock: products.find(p => p.id === productId)?.currentStock || 0,
+      currentStock: defaultStock,
       entries: 0,
-      outputCount: 0,
+      outputCount: null,
       countedStock: null,
       difference: 0,
       checked: false,
@@ -1516,23 +1501,25 @@ export default function App() {
         } else {
           const cur = Number(lojaItem.currentStock ?? p.currentStock) || 0;
           const ent = Number(lojaItem.entries) || 0;
-          const diff = Math.abs(Number(lojaItem.difference) || 0);
-          estoqueLoja = Math.max(0, cur + ent - diff);
+          const hasTarde = lojaItem.outputCount !== null && lojaItem.outputCount !== undefined && lojaItem.outputCount !== '';
+          if (hasTarde) {
+            estoqueLoja = Number(lojaItem.outputCount);
+          } else {
+            estoqueLoja = cur + ent;
+          }
         }
       }
 
-      // 2. Depósito Stock
+      // 2. Depósito Stock (Estoque do Depósito + Entradas)
       const depItem = depSession[p.id];
-      let estoqueDeposito = 0;
+      let estoqueDeposito = p.depositoStock ?? 0;
       if (depItem) {
-        const baseDep = Number(depItem.currentStock ?? p.currentStock) || 0;
+        const baseDep = Number(depItem.currentStock ?? p.depositoStock ?? 0) || 0;
         const entriesDep = Number(depItem.entries) || 0;
         estoqueDeposito = baseDep + entriesDep;
-      } else {
-        estoqueDeposito = p.currentStock || 0;
       }
 
-      // 3. Estoque Geral
+      // 3. Estoque Geral = Loja + Depósito
       const totalGeral = estoqueLoja + estoqueDeposito;
       const minStock = Number(p.minStock) || 0;
 
@@ -1569,17 +1556,21 @@ export default function App() {
         } else {
           const cur = Number(lojaItem.currentStock ?? p.currentStock) || 0;
           const ent = Number(lojaItem.entries) || 0;
-          const diff = Math.abs(Number(lojaItem.difference) || 0);
-          estoqueLoja = Math.max(0, cur + ent - diff);
+          const hasTarde = lojaItem.outputCount !== null && lojaItem.outputCount !== undefined && lojaItem.outputCount !== '';
+          if (hasTarde) {
+            estoqueLoja = Number(lojaItem.outputCount);
+          } else {
+            estoqueLoja = cur + ent;
+          }
         }
       }
 
       // Depósito
       const depItem = depSession[p.id];
-      let estoqueDep = p.currentStock || 0;
+      let estoqueDep = p.depositoStock ?? 0;
       let entriesDep = 0;
       if (depItem) {
-        estoqueDep = Number(depItem.currentStock ?? p.currentStock) || 0;
+        estoqueDep = Number(depItem.currentStock ?? p.depositoStock ?? 0) || 0;
         entriesDep = Number(depItem.entries) || 0;
       }
       const totalDep = estoqueDep + entriesDep;
