@@ -35,6 +35,8 @@ export default function DailyCountView({
   onBatchCheck,
   onSaveProduct
 }) {
+  const isDeposito = location === 'deposito';
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('TODAS');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'pending', 'checked', 'divergence'
@@ -164,14 +166,12 @@ export default function DailyCountView({
       itemsWithEntries,
       percentChecked
     };
-  }, [products, items]);
+  }, [products, items, isDeposito]);
 
   const handleCheckAllVisible = (checkState) => {
     const ids = filteredProducts.map(p => p.id);
     onBatchCheck(ids, checkState);
   };
-
-  const isDeposito = location === 'deposito';
 
   return (
     <div className="w-full space-y-4">
