@@ -97,10 +97,10 @@ function mergeProductList(currentList = [], incomingList = []) {
 // Helper to check if an item has actual user-entered data
 function hasRealCountData(item) {
   if (!item) return false;
-  return (item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '') ||
-         Number(item.outputCount) > 0 ||
+  return !!item.isManualStock ||
+         (item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '') ||
+         (item.outputCount !== null && item.outputCount !== undefined && item.outputCount !== '' && Number(item.outputCount) > 0) ||
          Number(item.entries) > 0 ||
-         Number(item.currentStock) > 0 ||
          !!item.checked ||
          (typeof item.observation === 'string' && item.observation.trim() !== '');
 }
@@ -122,21 +122,22 @@ function mergeItem(localItem, remoteItem) {
     return remoteItem;
   }
 
-  // If both have data or both are blank, compare timestamp
-  const localTime = new Date(localItem.lastModified || 0).getTime();
-  const remoteTime = new Date(remoteItem.lastModified || 0).getTime();
+  // If both have data or both are placeholders: compare timestamp
+  const localTime = localItem.lastModified ? new Date(localItem.lastModified).getTime() : 0;
+  const remoteTime = remoteItem.lastModified ? new Date(remoteItem.lastModified).getTime() : 0;
   const winner = remoteTime >= localTime ? remoteItem : localItem;
   const loser = winner === remoteItem ? localItem : remoteItem;
 
   return {
     ...loser,
     ...winner,
-    currentStock: (winner.currentStock !== undefined && winner.currentStock !== null && winner.currentStock !== 0)
+    currentStock: (winner.currentStock !== undefined && winner.currentStock !== null)
       ? winner.currentStock
-      : (loser.currentStock !== undefined && loser.currentStock !== null ? loser.currentStock : winner.currentStock),
+      : (loser.currentStock !== undefined && loser.currentStock !== null ? loser.currentStock : 0),
+    isManualStock: winner.isManualStock ?? loser.isManualStock ?? false,
     countedStock: (winner.countedStock !== null && winner.countedStock !== undefined && winner.countedStock !== '')
       ? winner.countedStock
-      : loser.countedStock
+      : (loser.countedStock !== null && loser.countedStock !== undefined && loser.countedStock !== '' ? loser.countedStock : null)
   };
 }
 
@@ -316,8 +317,14 @@ export default function App() {
         } catch (e) {}
       }
       if (cachedUsers) {
-        const parsedU = JSON.parse(cachedUsers);
-        setUsers(mergeUserList([], parsedU));
+        try {
+          const parsedU = JSON.parse(cachedUsers);
+          const cleanU = mergeUserList([], parsedU);
+          setUsers(cleanU);
+          localStorage.setItem('viva_users', JSON.stringify(cleanU));
+        } catch (e) {
+          setUsers([{ id: 'usr-altair-junior', name: 'Altair Junior' }]);
+        }
       }
       if (cachedSups) {
         try {
@@ -373,10 +380,6 @@ export default function App() {
             try {
               localStorage.setItem('viva_counts_history', JSON.stringify(merged));
             } catch (e) {}
-            // Dispara sincronização em nuvem caso este dispositivo tenha dados locais que a nuvem ainda não tem
-            if (isFirebaseConfigured()) {
-              syncEntireCountsHistoryToFirestore(merged).catch(() => {});
-            }
             return merged;
           });
 
@@ -625,36 +628,7 @@ export default function App() {
     };
   }, [isFirebaseActive]);
 
-  // Helper: Find previous day's counted stock for a product in a location
-  const getPrevCountedStock = useCallback((location, targetDateStr, productId, defaultVal) => {
-    const locCounts = countsHistory[location] || {};
-    const priorDates = Object.keys(locCounts)
-      .filter(d => d < targetDateStr)
-      .sort((a, b) => b.localeCompare(a)); // Descending: closest previous day first
-
-    for (const prevDate of priorDates) {
-      const prevItem = locCounts[prevDate]?.items?.[productId];
-      if (prevItem) {
-        if (prevItem.countedStock !== null && prevItem.countedStock !== undefined && prevItem.countedStock !== '') {
-          return Number(prevItem.countedStock);
-        }
-        if (location === 'deposito') {
-          const finalDep = (Number(prevItem.currentStock) || 0) + (Number(prevItem.entries) || 0);
-          if (finalDep > 0) return finalDep;
-        } else {
-          const cur = Number(prevItem.currentStock) || 0;
-          const ent = Number(prevItem.entries) || 0;
-          const out = Number(prevItem.outputCount) || 0;
-          if (cur > 0 || ent > 0 || out > 0) {
-            return Math.max(0, cur + ent - out);
-          }
-        }
-      }
-    }
-    return defaultVal;
-  }, [countsHistory]);
-
-  // Ensure count session exists for current location & selectedDate and carries over previous counted stock
+  // Ensure count session exists for current location & selectedDate without overwriting cloud counts or interfering with other days
   useEffect(() => {
     if (!loading && products.length > 0) {
       const locCounts = countsHistory[currentLocation] || {};
@@ -668,25 +642,19 @@ export default function App() {
             ? (p.depositoStock ?? p.currentStock ?? 0)
             : (p.currentStock ?? 0);
 
-          const initialStock = getPrevCountedStock(
-            currentLocation,
-            selectedDate,
-            p.id,
-            fallback
-          );
-
           newItems[p.id] = {
             productId: p.id,
-            currentStock: initialStock,
+            currentStock: fallback,
             entries: 0,
-            outputCount: 0,
+            outputCount: null,
             countedStock: null,
             difference: 0,
             checked: false,
             checkedAt: null,
             countedBy: defaultUser ? defaultUser.name : 'Conferente',
             observation: '',
-            lastModified: new Date().toISOString()
+            isManualStock: false,
+            lastModified: null // Placeholders have null timestamp so real cloud data always wins
           };
         });
 
@@ -708,13 +676,8 @@ export default function App() {
           try { localStorage.setItem('viva_counts_history', JSON.stringify(next)); } catch (e) {}
           return next;
         });
-
-        fetch(`${API_BASE}/counts/${selectedDate}?location=${currentLocation}`).catch(() => {});
-        if (isFirebaseConfigured()) {
-          syncSessionToFirestore(currentLocation, selectedDate, newSession);
-        }
       } else {
-        // If session exists, only add missing products without interfering with existing items
+        // If session exists, only add missing products as placeholders without touching existing items
         let needsStockRefresh = false;
         const updatedItems = { ...currentSess.items };
 
@@ -724,19 +687,19 @@ export default function App() {
             const fallback = currentLocation === 'deposito' 
               ? (p.depositoStock ?? p.currentStock ?? 0)
               : (p.currentStock ?? 0);
-            const prevStock = getPrevCountedStock(currentLocation, selectedDate, p.id, fallback);
             updatedItems[p.id] = {
               productId: p.id,
-              currentStock: prevStock,
+              currentStock: fallback,
               entries: 0,
-              outputCount: 0,
+              outputCount: null,
               countedStock: null,
               difference: 0,
               checked: false,
               checkedAt: null,
               countedBy: defaultUser ? defaultUser.name : 'Conferente',
               observation: '',
-              lastModified: new Date().toISOString()
+              isManualStock: false,
+              lastModified: null
             };
             needsStockRefresh = true;
           }
@@ -758,13 +721,10 @@ export default function App() {
             try { localStorage.setItem('viva_counts_history', JSON.stringify(next)); } catch (e) {}
             return next;
           });
-          if (isFirebaseConfigured()) {
-            syncSessionToFirestore(currentLocation, selectedDate, refreshedSession);
-          }
         }
       }
     }
-  }, [selectedDate, currentLocation, loading, products, users, currentUserId, countsHistory, getPrevCountedStock]);
+  }, [selectedDate, currentLocation, loading, products, users, currentUserId, countsHistory]);
 
   // Current session count data
   const currentCountData = (countsHistory[currentLocation] && countsHistory[currentLocation][selectedDate]) || {
@@ -868,41 +828,6 @@ export default function App() {
         }
       };
 
-      // Chain rule:
-      // In Depósito: propagate (currentStock + entries) to the immediately following date as its initial stock!
-      // In Loja: propagate countedStock if hasCount
-      const shouldPropagate = loc === 'deposito' || hasCount;
-      const finalStockToPropagate = loc === 'deposito' ? (numCurrent + numEntries) : Number(updatedItem.countedStock);
-
-      if (shouldPropagate) {
-        const futureDates = Object.keys(updatedLoc)
-          .filter(d => d > selectedDate)
-          .sort((a, b) => a.localeCompare(b));
-
-        if (futureDates.length > 0) {
-          const nextDate = futureDates[0];
-          const nextSess = updatedLoc[nextDate];
-          if (nextSess && nextSess.items && nextSess.items[productId]) {
-            const nextIt = { ...nextSess.items[productId] };
-            // NUNCA sobrescreve se o usuário alterou manualmente o estoque ou se já existem contagens registradas
-            if (!nextIt.isManualStock && (!nextIt.currentStock || Number(nextIt.currentStock) === 0) && !hasRealCountData(nextIt)) {
-              nextIt.currentStock = finalStockToPropagate;
-              const nextGeral = nextIt.currentStock + (Number(nextIt.entries) || 0) - (Number(nextIt.outputCount) || 0);
-              if (nextIt.countedStock !== null && nextIt.countedStock !== undefined && nextIt.countedStock !== '') {
-                nextIt.difference = Number(nextIt.countedStock) - nextGeral;
-              }
-              updatedLoc[nextDate] = {
-                ...nextSess,
-                items: {
-                  ...nextSess.items,
-                  [productId]: nextIt
-                }
-              };
-            }
-          }
-        }
-      }
-
       const nextHistory = {
         ...prev,
         [loc]: updatedLoc
@@ -979,11 +904,6 @@ export default function App() {
         lastModified: now
       };
 
-      const hasCount = item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '';
-      const finalVal = (newCheckState && hasCount)
-        ? Number(item.countedStock)
-        : ((Number(item.currentStock) || 0) + (Number(item.entries) || 0) - (Number(item.outputCount) || 0));
-
       const updatedLoc = {
         ...locSessions,
         [selectedDate]: {
@@ -994,30 +914,6 @@ export default function App() {
           }
         }
       };
-
-      const futureDates = Object.keys(updatedLoc)
-        .filter(d => d > selectedDate)
-        .sort((a, b) => a.localeCompare(b));
-
-      if (futureDates.length > 0) {
-        const nextDate = futureDates[0];
-        const nextSess = updatedLoc[nextDate];
-        if (nextSess && nextSess.items && nextSess.items[productId]) {
-          const nextIt = { ...nextSess.items[productId] };
-          nextIt.currentStock = finalVal;
-          const nextExp = nextIt.currentStock + (Number(nextIt.entries) || 0) - (Number(nextIt.outputCount) || 0);
-          if (nextIt.countedStock !== null && nextIt.countedStock !== undefined && nextIt.countedStock !== '') {
-            nextIt.difference = Number(nextIt.countedStock) - nextExp;
-          }
-          updatedLoc[nextDate] = {
-            ...nextSess,
-            items: {
-              ...nextSess.items,
-              [productId]: nextIt
-            }
-          };
-        }
-      }
 
       const nextHistory = {
         ...prev,

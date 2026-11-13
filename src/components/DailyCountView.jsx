@@ -131,7 +131,8 @@ export default function DailyCountView({
 
     products.forEach(p => {
       const it = items[p.id];
-      const cur = Number(it?.currentStock ?? p.currentStock) || 0;
+      const baseStock = isDeposito ? (p.depositoStock ?? p.currentStock ?? 0) : (p.currentStock ?? 0);
+      const cur = Number(it?.currentStock ?? baseStock) || 0;
       const ent = Number(it?.entries) || 0;
       totalStock += (cur + ent);
       if (ent > 0) itemsWithEntries++;
@@ -520,7 +521,11 @@ export default function DailyCountView({
                     observation: ''
                   };
 
-                  const currentStock = Number(item.currentStock ?? fallbackStock) || 0;
+                  const currentStock = item.isManualStock 
+                    ? Number(item.currentStock ?? 0)
+                    : (item.currentStock !== undefined && item.currentStock !== null 
+                        ? Number(item.currentStock) 
+                        : fallbackStock);
                   const entries = Number(item.entries) || 0;
                   const tardeCount = Number(item.outputCount) || 0;
                   const hasCount = item.countedStock !== null && item.countedStock !== undefined && item.countedStock !== '';
